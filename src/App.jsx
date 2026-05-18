@@ -1,7 +1,7 @@
 import React, { useMemo, useRef, useState } from "react";
 import { Canvas, useLoader } from "@react-three/fiber";
 import { OrbitControls, Center, Grid, Html } from "@react-three/drei";
-import { STLLoader } from "three/examples/jsm/loaders/STLLoader";
+import { STLLoader } from "three/examples/jsm/loaders/STLLoader.js";
 import { Upload, Search, FolderPlus, Tag, Trash2, Box, Download, Eye, Plus, X, Archive, HardDrive } from "lucide-react";
 
 function formatBytes(bytes) {

@@ -1,20 +1,30 @@
-# STL Storage Organizer Viewer
+# STL Storage Organizer
 
-A Vite + React prototype for uploading, organizing, tagging, searching, downloading, and previewing STL files in the browser.
+Local browser-based STL storage, organizer, and viewer.
 
-## Local testing
+## Features
+
+- Upload STL files
+- Preview STL files in a 3D viewer
+- Store files locally with IndexedDB
+- Files persist after refresh in the same browser
+- Folder organization
+- Tags
+- Search
+- Rename files with the pencil icon
+- Delete files
+- Download files
+
+## Deploy
+
+Use Vercel settings:
+
+- Build command: `npm run build`
+- Output directory: `dist`
+
+## Local dev
 
 ```bash
 npm install
 npm run dev
 ```
-
-## Vercel settings
-
-- Framework preset: Vite
-- Build command: `npm run build`
-- Output directory: `dist`
-
-## Notes
-
-This prototype keeps STL files in the browser session using object URLs. Refreshing the page clears the uploaded files. For permanent cloud storage, connect Supabase, Firebase, Appwrite, or another backend.

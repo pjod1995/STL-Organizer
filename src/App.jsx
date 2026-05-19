@@ -32,7 +32,10 @@ useEffect(()=>{if(!supabase)return;supabase.auth.getSession().then(({data})=>set
 useEffect(()=>{if(!supabase||!session)return;loadCloudLibrary();const ch=supabase.channel("stl-files-live").on("postgres_changes",{event:"*",schema:"public",table:"stl_files"},()=>loadCloudLibrary()).subscribe();return()=>supabase.removeChannel(ch)},[session]);
 useEffect(()=>()=>{if(selectedPreviewUrl)URL.revokeObjectURL(selectedPreviewUrl)},[selectedPreviewUrl]);
 
-async function signInWithMagicLink(){if(!supabase){setAuthMessage("Supabase is not configured.");return}if(!email.trim())return;const{error}=await supabase.auth.signInWithPassword({email:email.trim(),options:{emailRedirectTo:window.location.origin}});setAuthMessage(error?error.message:"Check your email for the sign-in link.")}
+async function signInWithMagicLink(){if(!supabase){setAuthMessage("Supabase is not configured.");return}if(!email.trim())return;const { error } = await supabase.auth.signInWithPassword({
+  email,
+  password,
+});setAuthMessage(error?error.message:"Check your email for the sign-in link.")}
 async function signOut(){if(!supabase)return;await supabase.auth.signOut();setFiles([]);setSelectedId(null);if(selectedPreviewUrl)URL.revokeObjectURL(selectedPreviewUrl);setSelectedPreviewUrl(null);setStatus("Signed out.")}
 async function loadCloudLibrary(){if(!supabase)return;setIsLoading(true);const{data,error}=await supabase.from("stl_files").select("*").order("created_at",{ascending:false});if(error)setStatus(`Could not load shared library: ${error.message}`);else{setFiles(data||[]);setStatus("Shared cloud library loaded.")}setIsLoading(false)}
 

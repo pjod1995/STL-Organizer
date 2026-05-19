@@ -1,12 +1,21 @@
-# STL Storage Organizer
+# Final STL Storage Organizer
 
-This ZIP includes the corrected Vite/Tailwind setup.
+Features:
+- STL upload
+- IndexedDB persistence
+- Folder organization
+- Subfolders
+- Rename/delete folders
+- Rename/delete files
+- Tags
+- Search
+- Sorting
+- STL viewer
+- Local persistent library
 
-Before deploying:
-1. Replace src/App.jsx with your full canvas App.jsx.
-2. Run npm install locally OR deploy directly to Vercel.
-
-Vercel settings:
-- Framework: Vite
+Deploy:
+- Upload to GitHub
+- Import into Vercel
+- Framework preset: Vite
 - Build command: npm run build
 - Output directory: dist

@@ -4,8 +4,25 @@ import { OrbitControls, Center, Grid, Html } from "@react-three/drei";
 import { STLLoader } from "three/examples/jsm/loaders/STLLoader";
 import { createClient } from "@supabase/supabase-js";
 import {
-  Archive, Box, Check, Cloud, Download, Eye, FolderPlus, HardDrive, Library,
-  ListFilter, LogIn, LogOut, Pencil, Plus, Search, Tag, Trash2, Upload, X
+  Archive,
+  Box,
+  Check,
+  Cloud,
+  Download,
+  Eye,
+  FolderPlus,
+  HardDrive,
+  Library,
+  ListFilter,
+  LogIn,
+  LogOut,
+  Pencil,
+  Plus,
+  Search,
+  Tag,
+  Trash2,
+  Upload,
+  X,
 } from "lucide-react";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
@@ -27,6 +44,7 @@ function formatBytes(bytes) {
 
 function STLModel({ url }) {
   const geometry = useLoader(STLLoader, url);
+
   const centeredGeometry = useMemo(() => {
     const g = geometry.clone();
     g.computeVertexNormals();
@@ -51,7 +69,9 @@ function Viewer({ selected }) {
         <div>
           <Box className="mx-auto mb-4 h-14 w-14 text-purple-400" />
           <h2 className="text-xl font-semibold text-white">No STL selected</h2>
-          <p className="mt-2 text-sm text-zinc-400">Select a file to download and preview it.</p>
+          <p className="mt-2 text-sm text-zinc-400">
+            Select a file to download and preview it.
+          </p>
         </div>
       </div>
     );
@@ -62,21 +82,45 @@ function Viewer({ selected }) {
       <div className="flex items-center justify-between border-b border-zinc-800 px-4 py-3">
         <div>
           <h2 className="font-semibold text-white">{selected.name}</h2>
-          <p className="text-xs text-zinc-500">{selected.folder} · {formatBytes(selected.size)}</p>
+          <p className="text-xs text-zinc-500">
+            {selected.folder} · {formatBytes(selected.size)}
+          </p>
         </div>
-        <a href={selected.previewUrl} download={selected.name} className="inline-flex items-center gap-2 rounded-xl bg-zinc-800 px-3 py-2 text-sm text-zinc-100 hover:bg-zinc-700">
-          <Download className="h-4 w-4" /> Download
+        <a
+          href={selected.previewUrl}
+          download={selected.name}
+          className="inline-flex items-center gap-2 rounded-xl bg-zinc-800 px-3 py-2 text-sm text-zinc-100 hover:bg-zinc-700"
+        >
+          <Download className="h-4 w-4" />
+          Download
         </a>
       </div>
+
       <div className="h-[520px] w-full">
         <Canvas camera={{ position: [85, 65, 85], fov: 45 }} shadows>
           <ambientLight intensity={0.45} />
           <directionalLight position={[8, 12, 8]} intensity={1.1} castShadow />
           <directionalLight position={[-8, 4, -8]} intensity={0.45} />
-          <React.Suspense fallback={<Html center><div className="rounded-xl bg-zinc-900 px-4 py-2 text-sm text-white">Loading STL...</div></Html>}>
+
+          <React.Suspense
+            fallback={
+              <Html center>
+                <div className="rounded-xl bg-zinc-900 px-4 py-2 text-sm text-white">
+                  Loading STL...
+                </div>
+              </Html>
+            }
+          >
             <STLModel url={selected.previewUrl} />
           </React.Suspense>
-          <Grid infiniteGrid sectionColor="#7c3aed" cellColor="#3f3f46" fadeDistance={420} fadeStrength={2} />
+
+          <Grid
+            infiniteGrid
+            sectionColor="#7c3aed"
+            cellColor="#3f3f46"
+            fadeDistance={420}
+            fadeStrength={2}
+          />
           <OrbitControls makeDefault enableDamping dampingFactor={0.08} />
         </Canvas>
       </div>
@@ -89,6 +133,8 @@ export default function App() {
 
   const [session, setSession] = useState(null);
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [authMode, setAuthMode] = useState("signIn");
   const [authMessage, setAuthMessage] = useState("");
 
   const [files, setFiles] = useState([]);
@@ -113,7 +159,7 @@ export default function App() {
 
   const [status, setStatus] = useState(
     supabase
-      ? "Sign in to use the shared STL library."
+      ? "Sign in with email and password to use the shared STL library."
       : "Supabase is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY."
   );
   const [isLoading, setIsLoading] = useState(false);
@@ -123,9 +169,13 @@ export default function App() {
   useEffect(() => {
     if (!supabase) return;
 
-    supabase.auth.getSession().then(({ data }) => setSession(data.session));
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session);
+    });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, newSession) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, newSession) => {
       setSession(newSession);
     });
 
@@ -139,7 +189,11 @@ export default function App() {
 
     const channel = supabase
       .channel("stl-files-live")
-      .on("postgres_changes", { event: "*", schema: "public", table: "stl_files" }, () => loadCloudLibrary())
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "stl_files" },
+        () => loadCloudLibrary()
+      )
       .subscribe();
 
     return () => {
@@ -153,30 +207,89 @@ export default function App() {
     };
   }, [selectedPreviewUrl]);
 
-  async function signInWithMagicLink() {
-    if (!supabase) return setAuthMessage("Supabase is not configured.");
-    if (!email.trim()) return;
+  async function signInWithPassword() {
+    if (!supabase) {
+      setAuthMessage("Supabase is not configured.");
+      return;
+    }
 
-    const { error } = await supabase.auth.signInWithOtp({
+    if (!email.trim() || !password) {
+      setAuthMessage("Enter both email and password.");
+      return;
+    }
+
+    setIsLoading(true);
+    setAuthMessage("");
+
+    const { data, error } = await supabase.auth.signInWithPassword({
       email: email.trim(),
-      options: { emailRedirectTo: window.location.origin },
+      password,
     });
 
-    setAuthMessage(error ? error.message : "Check your email for the sign-in link.");
+    if (error) {
+      setAuthMessage(error.message);
+      setStatus(`Sign in failed: ${error.message}`);
+    } else {
+      setSession(data.session);
+      setAuthMessage("");
+      setStatus("Signed in.");
+      await loadCloudLibrary();
+    }
+
+    setIsLoading(false);
+  }
+
+  async function signUpWithPassword() {
+    if (!supabase) {
+      setAuthMessage("Supabase is not configured.");
+      return;
+    }
+
+    if (!email.trim() || !password) {
+      setAuthMessage("Enter both email and password.");
+      return;
+    }
+
+    setIsLoading(true);
+    setAuthMessage("");
+
+    const { data, error } = await supabase.auth.signUp({
+      email: email.trim(),
+      password,
+    });
+
+    if (error) {
+      setAuthMessage(error.message);
+      setStatus(`Sign up failed: ${error.message}`);
+    } else if (data.session) {
+      setSession(data.session);
+      setAuthMessage("");
+      setStatus("Account created and signed in.");
+      await loadCloudLibrary();
+    } else {
+      setAuthMessage("Account created. Check your email if confirmation is enabled.");
+      setStatus("Account created. Sign in after confirming your email if required.");
+    }
+
+    setIsLoading(false);
   }
 
   async function signOut() {
     if (!supabase) return;
+
     await supabase.auth.signOut();
     setFiles([]);
     setSelectedId(null);
+
     if (selectedPreviewUrl) URL.revokeObjectURL(selectedPreviewUrl);
+
     setSelectedPreviewUrl(null);
     setStatus("Signed out.");
   }
 
   async function loadCloudLibrary() {
     if (!supabase) return;
+
     setIsLoading(true);
 
     const { data, error } = await supabase
@@ -184,8 +297,9 @@ export default function App() {
       .select("*")
       .order("created_at", { ascending: false });
 
-    if (error) setStatus(`Could not load shared library: ${error.message}`);
-    else {
+    if (error) {
+      setStatus(`Could not load shared library: ${error.message}`);
+    } else {
       setFiles(data || []);
       setStatus("Shared cloud library loaded.");
     }
@@ -195,15 +309,19 @@ export default function App() {
 
   const folders = useMemo(() => {
     const folderSet = new Set(DEFAULT_FOLDERS);
+
     files.forEach((file) => {
       if (!file.folder) return;
+
       const parts = file.folder.split("/");
       let current = "";
+
       parts.forEach((part) => {
         current = current ? `${current}/${part}` : part;
         folderSet.add(current);
       });
     });
+
     return Array.from(folderSet).sort((a, b) => a.localeCompare(b));
   }, [files]);
 
@@ -215,16 +333,23 @@ export default function App() {
   const libraryStats = useMemo(() => {
     const totalSize = files.reduce((sum, file) => sum + Number(file.size || 0), 0);
     const folderCount = new Set(files.map((file) => file.folder || "Unsorted")).size;
-    return { totalSize, folderCount, fileCount: files.length };
+
+    return {
+      totalSize,
+      folderCount,
+      fileCount: files.length,
+    };
   }, [files]);
 
   const folderCounts = useMemo(() => {
     const counts = { All: files.length };
+
     folders.forEach((folder) => {
       counts[folder] = files.filter(
         (file) => file.folder === folder || file.folder?.startsWith(`${folder}/`)
       ).length;
     });
+
     return counts;
   }, [files, folders]);
 
@@ -234,6 +359,7 @@ export default function App() {
 
     const result = files.filter((file) => {
       const tags = Array.isArray(file.tags) ? file.tags : [];
+
       const matchesFolder =
         activeFilter === "All" ||
         file.folder === activeFilter ||
@@ -254,6 +380,7 @@ export default function App() {
       if (sortMode === "sizeDesc") return Number(b.size || 0) - Number(a.size || 0);
       if (sortMode === "sizeAsc") return Number(a.size || 0) - Number(b.size || 0);
       if (sortMode === "oldest") return new Date(a.created_at) - new Date(b.created_at);
+
       return new Date(b.created_at) - new Date(a.created_at);
     });
   }, [files, folderFilter, browserFolder, query, sortMode]);
@@ -301,8 +428,11 @@ export default function App() {
         uploader_email: user.email,
       });
 
-      if (insertResult.error) setStatus(`Metadata save failed for ${file.name}: ${insertResult.error.message}`);
-      else setStatus(`${file.name} uploaded to shared library.`);
+      if (insertResult.error) {
+        setStatus(`Metadata save failed for ${file.name}: ${insertResult.error.message}`);
+      } else {
+        setStatus(`${file.name} uploaded to shared library.`);
+      }
     }
 
     event.target.value = "";
@@ -338,15 +468,27 @@ export default function App() {
     const confirmed = window.confirm(`Delete "${file.name}" from the shared library?`);
     if (!confirmed) return;
 
-    const storageResult = await supabase.storage.from(STORAGE_BUCKET).remove([file.storage_path]);
-    if (storageResult.error) return setStatus(`Storage delete failed: ${storageResult.error.message}`);
+    const storageResult = await supabase.storage
+      .from(STORAGE_BUCKET)
+      .remove([file.storage_path]);
+
+    if (storageResult.error) {
+      setStatus(`Storage delete failed: ${storageResult.error.message}`);
+      return;
+    }
 
     const dbResult = await supabase.from("stl_files").delete().eq("id", file.id);
-    if (dbResult.error) return setStatus(`Database delete failed: ${dbResult.error.message}`);
+
+    if (dbResult.error) {
+      setStatus(`Database delete failed: ${dbResult.error.message}`);
+      return;
+    }
 
     if (selectedId === file.id) {
       setSelectedId(null);
+
       if (selectedPreviewUrl) URL.revokeObjectURL(selectedPreviewUrl);
+
       setSelectedPreviewUrl(null);
     }
 
@@ -383,6 +525,7 @@ export default function App() {
 
   async function saveRename(id) {
     const cleanName = renameValue.trim();
+
     if (!cleanName) return;
 
     const finalName = cleanName.toLowerCase().endsWith(".stl")
@@ -390,6 +533,7 @@ export default function App() {
       : `${cleanName}.stl`;
 
     const ok = await updateFileRecord(id, { name: finalName }, "File renamed.");
+
     if (ok) {
       setRenamingId(null);
       setRenameValue("");
@@ -405,22 +549,35 @@ export default function App() {
     if (!selected) return;
 
     const tag = tagInput.trim();
+
     if (!tag) return;
 
     const tags = Array.isArray(selected.tags) ? selected.tags : [];
+
     if (tags.includes(tag)) return;
 
-    const ok = await updateFileRecord(selected.id, { tags: [...tags, tag] }, "Tag added.");
+    const ok = await updateFileRecord(
+      selected.id,
+      { tags: [...tags, tag] },
+      "Tag added."
+    );
+
     if (ok) setTagInput("");
   }
 
   async function removeTag(file, tag) {
     const tags = Array.isArray(file.tags) ? file.tags : [];
-    await updateFileRecord(file.id, { tags: tags.filter((item) => item !== tag) }, "Tag removed.");
+
+    await updateFileRecord(
+      file.id,
+      { tags: tags.filter((item) => item !== tag) },
+      "Tag removed."
+    );
   }
 
   async function addFolder() {
     const folderName = newFolder.trim().replace(/^\/+|\/+$/g, "");
+
     if (!folderName) return;
 
     const folder =
@@ -431,7 +588,9 @@ export default function App() {
     setFolderFilter(folder);
     setNewFolder("");
     setNewFolderParent("Root");
-    setStatus(`Folder "${folder}" ready. Upload or move a file into it to keep it in the shared library.`);
+    setStatus(
+      `Folder "${folder}" ready. Upload or move a file into it to keep it in the shared library.`
+    );
   }
 
   function startEditingFolder(folder) {
@@ -446,6 +605,7 @@ export default function App() {
 
   async function saveFolderEdit(oldFolder) {
     const newName = folderEditValue.trim().replace(/^\/+|\/+$/g, "");
+
     if (!newName || newName === oldFolder) return;
 
     const matchingFiles = files.filter(
@@ -475,10 +635,13 @@ export default function App() {
     const confirmed = window.confirm(
       `Delete folder "${folderToDelete}"? Files in this folder and its subfolders will be moved to Unsorted.`
     );
+
     if (!confirmed) return;
 
     const matchingFiles = files.filter(
-      (file) => file.folder === folderToDelete || file.folder?.startsWith(`${folderToDelete}/`)
+      (file) =>
+        file.folder === folderToDelete ||
+        file.folder?.startsWith(`${folderToDelete}/`)
     );
 
     for (const file of matchingFiles) {
@@ -494,7 +657,10 @@ export default function App() {
   }
 
   async function deleteAllFolders() {
-    const confirmed = window.confirm("Delete all folders? All files will be moved to Unsorted.");
+    const confirmed = window.confirm(
+      "Delete all folders? All files will be moved to Unsorted."
+    );
+
     if (!confirmed) return;
 
     for (const file of files) {
@@ -519,42 +685,76 @@ export default function App() {
               <Archive className="h-3.5 w-3.5" />
               Shared Cloud STL Library
             </div>
+
             <h1 className="text-3xl font-bold tracking-tight text-white md:text-4xl">
               STL Storage, Organizer, and Viewer
             </h1>
+
             <p className="mt-2 max-w-2xl text-sm text-zinc-400">
-              Multi-user STL uploads, downloads, shared cloud storage, folders, subfolders, tags, search, sorting, and 3D previews.
+              Multi-user STL uploads, downloads, shared cloud storage, folders,
+              subfolders, tags, search, sorting, and 3D previews.
             </p>
           </div>
 
           <div className="rounded-2xl border border-zinc-800 bg-zinc-950/80 p-3">
             {!supabase ? (
               <p className="max-w-sm text-xs text-red-300">
-                Supabase is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.
+                Supabase is not configured. Add VITE_SUPABASE_URL and
+                VITE_SUPABASE_ANON_KEY.
               </p>
             ) : user ? (
               <div className="flex flex-wrap items-center gap-2">
                 <span className="rounded-xl border border-zinc-800 px-3 py-2 text-xs text-zinc-300">
                   {user.email}
                 </span>
-                <button onClick={signOut} className="inline-flex items-center gap-2 rounded-xl bg-zinc-800 px-3 py-2 text-sm text-white hover:bg-zinc-700">
+                <button
+                  onClick={signOut}
+                  className="inline-flex items-center gap-2 rounded-xl bg-zinc-800 px-3 py-2 text-sm text-white hover:bg-zinc-700"
+                >
                   <LogOut className="h-4 w-4" />
                   Sign Out
                 </button>
               </div>
             ) : (
-              <div className="flex flex-wrap gap-2">
+              <div className="grid gap-2">
                 <input
                   value={email}
                   onChange={(event) => setEmail(event.target.value)}
                   placeholder="email@example.com"
                   className="rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-white outline-none placeholder:text-zinc-600"
                 />
-                <button onClick={signInWithMagicLink} className="inline-flex items-center gap-2 rounded-xl bg-purple-600 px-3 py-2 text-sm font-semibold text-white hover:bg-purple-500">
-                  <LogIn className="h-4 w-4" />
-                  Sign In
-                </button>
-                {authMessage && <p className="basis-full text-xs text-purple-200">{authMessage}</p>}
+
+                <input
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  type="password"
+                  placeholder="Password"
+                  className="rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-white outline-none placeholder:text-zinc-600"
+                />
+
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={authMode === "signIn" ? signInWithPassword : signUpWithPassword}
+                    className="inline-flex items-center gap-2 rounded-xl bg-purple-600 px-3 py-2 text-sm font-semibold text-white hover:bg-purple-500"
+                  >
+                    <LogIn className="h-4 w-4" />
+                    {authMode === "signIn" ? "Sign In" : "Create Account"}
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setAuthMode(authMode === "signIn" ? "signUp" : "signIn");
+                      setAuthMessage("");
+                    }}
+                    className="rounded-xl bg-zinc-800 px-3 py-2 text-sm text-zinc-200 hover:bg-zinc-700"
+                  >
+                    {authMode === "signIn" ? "Need an account?" : "Have an account?"}
+                  </button>
+                </div>
+
+                {authMessage && (
+                  <p className="text-xs text-purple-200">{authMessage}</p>
+                )}
               </div>
             )}
           </div>
@@ -566,28 +766,39 @@ export default function App() {
               <HardDrive className="h-5 w-5 text-purple-300" />
               <span className="text-sm text-zinc-400">Files Stored</span>
             </div>
-            <p className="mt-2 text-2xl font-bold text-white">{libraryStats.fileCount}</p>
+            <p className="mt-2 text-2xl font-bold text-white">
+              {libraryStats.fileCount}
+            </p>
           </div>
+
           <div className="rounded-2xl border border-zinc-800 bg-zinc-900/80 p-4">
             <div className="flex items-center gap-3">
               <FolderPlus className="h-5 w-5 text-purple-300" />
               <span className="text-sm text-zinc-400">Active Folders</span>
             </div>
-            <p className="mt-2 text-2xl font-bold text-white">{libraryStats.folderCount || 0}</p>
+            <p className="mt-2 text-2xl font-bold text-white">
+              {libraryStats.folderCount || 0}
+            </p>
           </div>
+
           <div className="rounded-2xl border border-zinc-800 bg-zinc-900/80 p-4">
             <div className="flex items-center gap-3">
               <Box className="h-5 w-5 text-purple-300" />
               <span className="text-sm text-zinc-400">Library Size</span>
             </div>
-            <p className="mt-2 text-2xl font-bold text-white">{formatBytes(libraryStats.totalSize)}</p>
+            <p className="mt-2 text-2xl font-bold text-white">
+              {formatBytes(libraryStats.totalSize)}
+            </p>
           </div>
+
           <div className="rounded-2xl border border-zinc-800 bg-zinc-900/80 p-4">
             <div className="flex items-center gap-3">
               <Cloud className="h-5 w-5 text-purple-300" />
               <span className="text-sm text-zinc-400">Storage Mode</span>
             </div>
-            <p className="mt-2 text-sm font-semibold text-white">Supabase Cloud</p>
+            <p className="mt-2 text-sm font-semibold text-white">
+              Supabase Cloud
+            </p>
           </div>
         </section>
 
@@ -597,26 +808,48 @@ export default function App() {
               {isLoading ? "Loading..." : status}
             </div>
 
-            <button disabled={!user} onClick={() => fileInputRef.current?.click()} className="mb-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-purple-600 px-5 py-3 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40 hover:bg-purple-500">
+            <button
+              disabled={!user}
+              onClick={() => fileInputRef.current?.click()}
+              className="mb-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-purple-600 px-5 py-3 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40 hover:bg-purple-500"
+            >
               <Upload className="h-5 w-5" />
               Upload STL Files
             </button>
 
-            <input ref={fileInputRef} type="file" accept=".stl" multiple onChange={handleUpload} className="hidden" />
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".stl"
+              multiple
+              onChange={handleUpload}
+              className="hidden"
+            />
 
             <div className="mb-4 rounded-2xl border border-zinc-800 bg-zinc-950/60 p-3">
               <div className="mb-3 flex items-center gap-2">
                 <Library className="h-4 w-4 text-purple-300" />
-                <h3 className="text-sm font-semibold text-white">Library Browser</h3>
+                <h3 className="text-sm font-semibold text-white">
+                  Library Browser
+                </h3>
               </div>
 
               <div className="mb-3 flex items-center gap-2 rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2">
                 <Search className="h-4 w-4 text-zinc-500" />
-                <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search by name, tag, or uploader..." className="w-full bg-transparent text-sm text-zinc-100 outline-none placeholder:text-zinc-600" />
+                <input
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder="Search by name, tag, or uploader..."
+                  className="w-full bg-transparent text-sm text-zinc-100 outline-none placeholder:text-zinc-600"
+                />
               </div>
 
               <div className="mb-3 grid grid-cols-2 gap-2">
-                <select value={sortMode} onChange={(event) => setSortMode(event.target.value)} className="rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-200">
+                <select
+                  value={sortMode}
+                  onChange={(event) => setSortMode(event.target.value)}
+                  className="rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-200"
+                >
                   <option value="newest">Newest First</option>
                   <option value="oldest">Oldest First</option>
                   <option value="nameAsc">Name A-Z</option>
@@ -625,7 +858,14 @@ export default function App() {
                   <option value="sizeAsc">Smallest First</option>
                 </select>
 
-                <button onClick={() => { setBrowserFolder("All"); setFolderFilter("All"); setQuery(""); }} className="inline-flex items-center justify-center gap-2 rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-200 hover:bg-zinc-900">
+                <button
+                  onClick={() => {
+                    setBrowserFolder("All");
+                    setFolderFilter("All");
+                    setQuery("");
+                  }}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-200 hover:bg-zinc-900"
+                >
                   <ListFilter className="h-4 w-4" />
                   Reset
                 </button>
@@ -633,34 +873,77 @@ export default function App() {
 
               <div className="grid max-h-40 grid-cols-2 gap-2 overflow-auto pr-1">
                 {["All", ...folders].map((folder) => (
-                  <button key={folder} onClick={() => { setBrowserFolder(folder); setFolderFilter(folder); }} className={`flex items-center justify-between rounded-xl border px-3 py-2 text-left text-xs transition ${browserFolder === folder ? "border-purple-500 bg-purple-500/10 text-purple-100" : "border-zinc-800 bg-zinc-900/70 text-zinc-300 hover:border-zinc-700"}`}>
+                  <button
+                    key={folder}
+                    onClick={() => {
+                      setBrowserFolder(folder);
+                      setFolderFilter(folder);
+                    }}
+                    className={`flex items-center justify-between rounded-xl border px-3 py-2 text-left text-xs transition ${
+                      browserFolder === folder
+                        ? "border-purple-500 bg-purple-500/10 text-purple-100"
+                        : "border-zinc-800 bg-zinc-900/70 text-zinc-300 hover:border-zinc-700"
+                    }`}
+                  >
                     <span className="truncate">{folder}</span>
-                    <span className="ml-2 rounded-full bg-zinc-800 px-2 py-0.5 text-[10px] text-zinc-400">{folderCounts[folder] || 0}</span>
+                    <span className="ml-2 rounded-full bg-zinc-800 px-2 py-0.5 text-[10px] text-zinc-400">
+                      {folderCounts[folder] || 0}
+                    </span>
                   </button>
                 ))}
               </div>
             </div>
 
             <div className="mb-4 grid grid-cols-2 gap-2">
-              <select value={activeFolder} onChange={(event) => setActiveFolder(event.target.value)} className="rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-200">
-                {folders.map((folder) => <option key={folder}>{folder}</option>)}
+              <select
+                value={activeFolder}
+                onChange={(event) => setActiveFolder(event.target.value)}
+                className="rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-200"
+              >
+                {folders.map((folder) => (
+                  <option key={folder}>{folder}</option>
+                ))}
               </select>
 
-              <select value={folderFilter} onChange={(event) => setFolderFilter(event.target.value)} className="rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-200">
+              <select
+                value={folderFilter}
+                onChange={(event) => setFolderFilter(event.target.value)}
+                className="rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-200"
+              >
                 <option>All</option>
-                {folders.map((folder) => <option key={folder}>{folder}</option>)}
+                {folders.map((folder) => (
+                  <option key={folder}>{folder}</option>
+                ))}
               </select>
             </div>
 
             <div className="mb-4 grid gap-2">
-              <select value={newFolderParent} onChange={(event) => setNewFolderParent(event.target.value)} className="rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-200">
+              <select
+                value={newFolderParent}
+                onChange={(event) => setNewFolderParent(event.target.value)}
+                className="rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-200"
+              >
                 <option value="Root">Root Folder</option>
-                {folders.map((folder) => <option key={folder} value={folder}>Inside {folder}</option>)}
+                {folders.map((folder) => (
+                  <option key={folder} value={folder}>
+                    Inside {folder}
+                  </option>
+                ))}
               </select>
 
               <div className="flex gap-2">
-                <input value={newFolder} onChange={(event) => setNewFolder(event.target.value)} onKeyDown={(event) => event.key === "Enter" && addFolder()} placeholder="New folder or subfolder" className="min-w-0 flex-1 rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm outline-none placeholder:text-zinc-600" />
-                <button onClick={addFolder} className="rounded-xl bg-zinc-800 px-3 py-2 hover:bg-zinc-700">
+                <input
+                  value={newFolder}
+                  onChange={(event) => setNewFolder(event.target.value)}
+                  onKeyDown={(event) => event.key === "Enter" && addFolder()}
+                  placeholder="New folder or subfolder"
+                  className="min-w-0 flex-1 rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm outline-none placeholder:text-zinc-600"
+                />
+
+                <button
+                  onClick={addFolder}
+                  className="rounded-xl bg-zinc-800 px-3 py-2 hover:bg-zinc-700"
+                >
                   <Plus className="h-4 w-4" />
                 </button>
               </div>
@@ -668,10 +951,16 @@ export default function App() {
 
             <div className="mb-4 rounded-2xl border border-zinc-800 bg-zinc-950/60 p-3">
               <div className="mb-2 flex items-center justify-between gap-2">
-                <h3 className="text-sm font-semibold text-white">Manage Folders</h3>
+                <h3 className="text-sm font-semibold text-white">
+                  Manage Folders
+                </h3>
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-zinc-500">edit / delete</span>
-                  <button disabled={!user} onClick={deleteAllFolders} className="rounded-lg border border-red-500/30 bg-red-500/10 px-2 py-1 text-[10px] font-semibold text-red-300 disabled:cursor-not-allowed disabled:opacity-40 hover:bg-red-500/20">
+                  <button
+                    disabled={!user}
+                    onClick={deleteAllFolders}
+                    className="rounded-lg border border-red-500/30 bg-red-500/10 px-2 py-1 text-[10px] font-semibold text-red-300 disabled:cursor-not-allowed disabled:opacity-40 hover:bg-red-500/20"
+                  >
                     Delete All
                   </button>
                 </div>
@@ -679,18 +968,54 @@ export default function App() {
 
               <div className="max-h-44 space-y-2 overflow-auto pr-1">
                 {folders.map((folder) => (
-                  <div key={folder} className="flex items-center gap-2 rounded-xl border border-zinc-800 bg-zinc-900/70 px-2 py-2">
+                  <div
+                    key={folder}
+                    className="flex items-center gap-2 rounded-xl border border-zinc-800 bg-zinc-900/70 px-2 py-2"
+                  >
                     {editingFolder === folder ? (
                       <>
-                        <input value={folderEditValue} onChange={(event) => setFolderEditValue(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") saveFolderEdit(folder); if (event.key === "Escape") cancelFolderEdit(); }} autoFocus className="min-w-0 flex-1 rounded-lg border border-purple-500/40 bg-zinc-950 px-2 py-1 text-xs text-white outline-none" />
-                        <button onClick={() => saveFolderEdit(folder)} className="rounded-lg p-1 text-green-300 hover:bg-green-500/10"><Check className="h-3.5 w-3.5" /></button>
-                        <button onClick={cancelFolderEdit} className="rounded-lg p-1 text-zinc-400 hover:bg-zinc-800"><X className="h-3.5 w-3.5" /></button>
+                        <input
+                          value={folderEditValue}
+                          onChange={(event) => setFolderEditValue(event.target.value)}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter") saveFolderEdit(folder);
+                            if (event.key === "Escape") cancelFolderEdit();
+                          }}
+                          autoFocus
+                          className="min-w-0 flex-1 rounded-lg border border-purple-500/40 bg-zinc-950 px-2 py-1 text-xs text-white outline-none"
+                        />
+                        <button
+                          onClick={() => saveFolderEdit(folder)}
+                          className="rounded-lg p-1 text-green-300 hover:bg-green-500/10"
+                        >
+                          <Check className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          onClick={cancelFolderEdit}
+                          className="rounded-lg p-1 text-zinc-400 hover:bg-zinc-800"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
                       </>
                     ) : (
                       <>
-                        <span className="min-w-0 flex-1 truncate text-xs text-zinc-200">{folder}</span>
-                        <button disabled={!user} onClick={() => startEditingFolder(folder)} className="rounded-lg p-1 text-zinc-500 disabled:cursor-not-allowed disabled:opacity-40 hover:bg-purple-500/10 hover:text-purple-300"><Pencil className="h-3.5 w-3.5" /></button>
-                        <button disabled={!user} onClick={() => deleteFolder(folder)} className="rounded-lg p-1 text-zinc-500 disabled:cursor-not-allowed disabled:opacity-40 hover:bg-red-500/10 hover:text-red-300"><Trash2 className="h-3.5 w-3.5" /></button>
+                        <span className="min-w-0 flex-1 truncate text-xs text-zinc-200">
+                          {folder}
+                        </span>
+                        <button
+                          disabled={!user}
+                          onClick={() => startEditingFolder(folder)}
+                          className="rounded-lg p-1 text-zinc-500 disabled:cursor-not-allowed disabled:opacity-40 hover:bg-purple-500/10 hover:text-purple-300"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          disabled={!user}
+                          onClick={() => deleteFolder(folder)}
+                          className="rounded-lg p-1 text-zinc-500 disabled:cursor-not-allowed disabled:opacity-40 hover:bg-red-500/10 hover:text-red-300"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
                       </>
                     )}
                   </div>
@@ -700,53 +1025,117 @@ export default function App() {
 
             <div className="mb-3 flex items-center justify-between">
               <h2 className="font-semibold text-white">Shared Library</h2>
-              <span className="text-xs text-zinc-500">{filteredFiles.length} shown</span>
+              <span className="text-xs text-zinc-500">
+                {filteredFiles.length} shown
+              </span>
             </div>
 
             <div className="max-h-[640px] space-y-3 overflow-auto pr-1">
               {filteredFiles.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-zinc-700 p-5 text-center text-sm text-zinc-500">No STL files found.</div>
+                <div className="rounded-2xl border border-dashed border-zinc-700 p-5 text-center text-sm text-zinc-500">
+                  No STL files found.
+                </div>
               ) : (
                 filteredFiles.map((file) => {
                   const tags = Array.isArray(file.tags) ? file.tags : [];
+
                   return (
-                    <div key={file.id} className={`rounded-2xl border p-3 transition ${selectedId === file.id ? "border-purple-500 bg-purple-500/10" : "border-zinc-800 bg-zinc-950/70 hover:border-zinc-700"}`}>
+                    <div
+                      key={file.id}
+                      className={`rounded-2xl border p-3 transition ${
+                        selectedId === file.id
+                          ? "border-purple-500 bg-purple-500/10"
+                          : "border-zinc-800 bg-zinc-950/70 hover:border-zinc-700"
+                      }`}
+                    >
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0 flex-1">
                           {renamingId === file.id ? (
                             <div className="flex items-center gap-2">
-                              <input value={renameValue} onChange={(event) => setRenameValue(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") saveRename(file.id); if (event.key === "Escape") cancelRename(); }} autoFocus className="min-w-0 flex-1 rounded-lg border border-purple-500/40 bg-zinc-900 px-2 py-1.5 text-sm text-white outline-none" />
-                              <button onClick={() => saveRename(file.id)} className="rounded-lg p-1.5 text-green-300 hover:bg-green-500/10"><Check className="h-4 w-4" /></button>
-                              <button onClick={cancelRename} className="rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-800"><X className="h-4 w-4" /></button>
+                              <input
+                                value={renameValue}
+                                onChange={(event) => setRenameValue(event.target.value)}
+                                onKeyDown={(event) => {
+                                  if (event.key === "Enter") saveRename(file.id);
+                                  if (event.key === "Escape") cancelRename();
+                                }}
+                                autoFocus
+                                className="min-w-0 flex-1 rounded-lg border border-purple-500/40 bg-zinc-900 px-2 py-1.5 text-sm text-white outline-none"
+                              />
+                              <button
+                                onClick={() => saveRename(file.id)}
+                                className="rounded-lg p-1.5 text-green-300 hover:bg-green-500/10"
+                              >
+                                <Check className="h-4 w-4" />
+                              </button>
+                              <button
+                                onClick={cancelRename}
+                                className="rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-800"
+                              >
+                                <X className="h-4 w-4" />
+                              </button>
                             </div>
                           ) : (
-                            <button onClick={() => previewFile(file)} className="min-w-0 text-left">
+                            <button
+                              onClick={() => previewFile(file)}
+                              className="min-w-0 text-left"
+                            >
                               <div className="flex items-center gap-2">
                                 <Eye className="h-4 w-4 shrink-0 text-purple-300" />
-                                <p className="truncate font-medium text-white">{file.name}</p>
+                                <p className="truncate font-medium text-white">
+                                  {file.name}
+                                </p>
                               </div>
-                              <p className="mt-1 text-xs text-zinc-500">{file.folder} · {formatBytes(file.size)}</p>
-                              <p className="mt-1 truncate text-[10px] text-zinc-600">Uploaded by {file.uploader_email || "unknown"}</p>
+                              <p className="mt-1 text-xs text-zinc-500">
+                                {file.folder} · {formatBytes(file.size)}
+                              </p>
+                              <p className="mt-1 truncate text-[10px] text-zinc-600">
+                                Uploaded by {file.uploader_email || "unknown"}
+                              </p>
                             </button>
                           )}
                         </div>
 
                         <div className="flex shrink-0 items-center gap-1">
-                          <button disabled={!user} onClick={() => startRenaming(file)} className="rounded-lg p-1.5 text-zinc-500 disabled:cursor-not-allowed disabled:opacity-40 hover:bg-purple-500/10 hover:text-purple-300"><Pencil className="h-4 w-4" /></button>
-                          <button disabled={!user} onClick={() => deleteFile(file)} className="rounded-lg p-1.5 text-zinc-500 disabled:cursor-not-allowed disabled:opacity-40 hover:bg-red-500/10 hover:text-red-300"><Trash2 className="h-4 w-4" /></button>
+                          <button
+                            disabled={!user}
+                            onClick={() => startRenaming(file)}
+                            className="rounded-lg p-1.5 text-zinc-500 disabled:cursor-not-allowed disabled:opacity-40 hover:bg-purple-500/10 hover:text-purple-300"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </button>
+                          <button
+                            disabled={!user}
+                            onClick={() => deleteFile(file)}
+                            className="rounded-lg p-1.5 text-zinc-500 disabled:cursor-not-allowed disabled:opacity-40 hover:bg-red-500/10 hover:text-red-300"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
                         </div>
                       </div>
 
                       <div className="mt-3 flex items-center gap-2">
-                        <select value={file.folder} disabled={!user} onChange={(event) => moveFile(file.id, event.target.value)} className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-2 py-1.5 text-xs text-zinc-300 disabled:opacity-50">
-                          {folders.map((folder) => <option key={folder}>{folder}</option>)}
+                        <select
+                          value={file.folder}
+                          disabled={!user}
+                          onChange={(event) => moveFile(file.id, event.target.value)}
+                          className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-2 py-1.5 text-xs text-zinc-300 disabled:opacity-50"
+                        >
+                          {folders.map((folder) => (
+                            <option key={folder}>{folder}</option>
+                          ))}
                         </select>
                       </div>
 
                       {tags.length > 0 && (
                         <div className="mt-3 flex flex-wrap gap-1.5">
                           {tags.map((tag) => (
-                            <button key={tag} disabled={!user} onClick={() => removeTag(file, tag)} className="inline-flex items-center gap-1 rounded-full bg-zinc-800 px-2 py-1 text-xs text-zinc-300 disabled:opacity-50 hover:bg-zinc-700">
+                            <button
+                              key={tag}
+                              disabled={!user}
+                              onClick={() => removeTag(file, tag)}
+                              className="inline-flex items-center gap-1 rounded-full bg-zinc-800 px-2 py-1 text-xs text-zinc-300 disabled:opacity-50 hover:bg-zinc-700"
+                            >
                               {tag}
                               <X className="h-3 w-3" />
                             </button>
@@ -766,16 +1155,38 @@ export default function App() {
             <div className="rounded-2xl border border-zinc-800 bg-zinc-900/80 p-4">
               <div className="mb-3 flex items-center gap-2">
                 <Tag className="h-4 w-4 text-purple-300" />
-                <h3 className="font-semibold text-white">Tags for Selected File</h3>
+                <h3 className="font-semibold text-white">
+                  Tags for Selected File
+                </h3>
               </div>
 
               <div className="flex gap-2">
-                <input value={tagInput} onChange={(event) => setTagInput(event.target.value)} onKeyDown={(event) => event.key === "Enter" && addTagToSelected()} disabled={!selected || !user} placeholder={selected ? "Add tags like 28mm, terrain, infantry..." : "Select a file first"} className="min-w-0 flex-1 rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm outline-none disabled:opacity-50" />
-                <button disabled={!selected || !user} onClick={addTagToSelected} className="rounded-xl bg-purple-600 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40 hover:bg-purple-500">Add Tag</button>
+                <input
+                  value={tagInput}
+                  onChange={(event) => setTagInput(event.target.value)}
+                  onKeyDown={(event) => event.key === "Enter" && addTagToSelected()}
+                  disabled={!selected || !user}
+                  placeholder={
+                    selected
+                      ? "Add tags like 28mm, terrain, infantry..."
+                      : "Select a file first"
+                  }
+                  className="min-w-0 flex-1 rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm outline-none disabled:opacity-50"
+                />
+                <button
+                  disabled={!selected || !user}
+                  onClick={addTagToSelected}
+                  className="rounded-xl bg-purple-600 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40 hover:bg-purple-500"
+                >
+                  Add Tag
+                </button>
               </div>
 
               <p className="mt-3 text-xs text-zinc-500">
-                This version loads from the Supabase table named stl_files. Files uploaded directly to Supabase Storage will only appear here if they also have a matching row in stl_files.
+                This version uses email/password authentication and loads from
+                the Supabase table named stl_files. Files uploaded directly to
+                Supabase Storage will only appear here if they also have a
+                matching row in stl_files.
               </p>
             </div>
           </section>

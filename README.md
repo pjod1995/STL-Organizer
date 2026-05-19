@@ -1,30 +1,16 @@
-# STL Storage Organizer
 
-Local browser-based STL storage, organizer, and viewer.
+# STL Storage Organizer Viewer
 
-## Features
-
-- Upload STL files
-- Preview STL files in a 3D viewer
-- Store files locally with IndexedDB
-- Files persist after refresh in the same browser
-- Folder organization
+Features:
+- IndexedDB storage
+- STL Viewer
+- Folder management
+- Library browser
+- Search and sorting
+- File renaming
 - Tags
-- Search
-- Rename files with the pencil icon
-- Delete files
-- Download files
+- React Three Fiber rendering
 
-## Deploy
-
-Use Vercel settings:
-
-- Build command: `npm run build`
-- Output directory: `dist`
-
-## Local dev
-
-```bash
-npm install
-npm run dev
-```
+Deploy on Vercel:
+- Build Command: npm run build
+- Output Directory: dist

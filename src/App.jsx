@@ -3,149 +3,43 @@ import { Canvas, useLoader } from "@react-three/fiber";
 import { OrbitControls, Center, Grid, Html } from "@react-three/drei";
 import { STLLoader } from "three/examples/jsm/loaders/STLLoader";
 import {
-  Upload,
-  Search,
-  FolderPlus,
-  Tag,
-  Trash2,
+  Archive,
   Box,
+  Check,
+  Cloud,
+  Database,
   Download,
   Eye,
-  Plus,
-  X,
-  Archive,
+  FolderPlus,
   HardDrive,
-  Database,
-  Pencil,
-  Check,
   Library,
   ListFilter,
+  LogIn,
+  LogOut,
+  Pencil,
+  Plus,
+  Search,
+  Tag,
+  Trash2,
+  Upload,
+  X,
 } from "lucide-react";
+import { createClient } from "@supabase/supabase-js";
 
-const DB_NAME = "stl-storage-organizer-db";
-const DB_VERSION = 1;
-const FILE_STORE = "stlFiles";
-const SETTINGS_STORE = "settings";
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabase =
+  supabaseUrl && supabaseAnonKey
+    ? createClient(supabaseUrl, supabaseAnonKey)
+    : null;
+
+const STORAGE_BUCKET = "stl-files";
 const DEFAULT_FOLDERS = ["Miniatures", "Terrain", "Bases", "Bits", "Unsorted"];
-
-function openDatabase() {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
-
-    request.onupgradeneeded = () => {
-      const db = request.result;
-
-      if (!db.objectStoreNames.contains(FILE_STORE)) {
-        db.createObjectStore(FILE_STORE, { keyPath: "id" });
-      }
-
-      if (!db.objectStoreNames.contains(SETTINGS_STORE)) {
-        db.createObjectStore(SETTINGS_STORE, { keyPath: "key" });
-      }
-    };
-
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-}
-
-async function getAllStoredFiles() {
-  const db = await openDatabase();
-
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(FILE_STORE, "readonly");
-    const store = transaction.objectStore(FILE_STORE);
-    const request = store.getAll();
-
-    request.onsuccess = () => resolve(request.result || []);
-    request.onerror = () => reject(request.error);
-    transaction.oncomplete = () => db.close();
-  });
-}
-
-async function saveStoredFile(fileRecord) {
-  const db = await openDatabase();
-
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(FILE_STORE, "readwrite");
-    const store = transaction.objectStore(FILE_STORE);
-    const request = store.put(fileRecord);
-
-    request.onsuccess = () => resolve();
-    request.onerror = () => reject(request.error);
-    transaction.oncomplete = () => db.close();
-  });
-}
-
-async function deleteStoredFile(id) {
-  const db = await openDatabase();
-
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(FILE_STORE, "readwrite");
-    const store = transaction.objectStore(FILE_STORE);
-    const request = store.delete(id);
-
-    request.onsuccess = () => resolve();
-    request.onerror = () => reject(request.error);
-    transaction.oncomplete = () => db.close();
-  });
-}
-
-async function clearStoredFiles() {
-  const db = await openDatabase();
-
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(FILE_STORE, "readwrite");
-    const store = transaction.objectStore(FILE_STORE);
-    const request = store.clear();
-
-    request.onsuccess = () => resolve();
-    request.onerror = () => reject(request.error);
-    transaction.oncomplete = () => db.close();
-  });
-}
-
-async function getStoredFolders() {
-  const db = await openDatabase();
-
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(SETTINGS_STORE, "readonly");
-    const store = transaction.objectStore(SETTINGS_STORE);
-    const request = store.get("folders");
-
-    request.onsuccess = () => resolve(request.result?.value || DEFAULT_FOLDERS);
-    request.onerror = () => reject(request.error);
-    transaction.oncomplete = () => db.close();
-  });
-}
-
-async function saveStoredFolders(folders) {
-  const db = await openDatabase();
-
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(SETTINGS_STORE, "readwrite");
-    const store = transaction.objectStore(SETTINGS_STORE);
-    const request = store.put({ key: "folders", value: folders });
-
-    request.onsuccess = () => resolve();
-    request.onerror = () => reject(request.error);
-    transaction.oncomplete = () => db.close();
-  });
-}
-
-function createFileView(record) {
-  return {
-    ...record,
-    url: URL.createObjectURL(record.blob),
-  };
-}
 
 function formatBytes(bytes) {
   if (!bytes) return "0 B";
-
   const sizes = ["B", "KB", "MB", "GB"];
   const i = Math.floor(Math.log(bytes) / Math.log(1024));
-
   return `${(bytes / Math.pow(1024, i)).toFixed(i === 0 ? 0 : 1)} ${sizes[i]}`;
 }
 
@@ -170,14 +64,14 @@ function STLModel({ url }) {
 }
 
 function Viewer({ selected }) {
-  if (!selected) {
+  if (!selected?.previewUrl) {
     return (
       <div className="flex h-full min-h-[480px] items-center justify-center rounded-2xl border border-dashed border-zinc-700 bg-zinc-950/80 p-8 text-center">
         <div>
           <Box className="mx-auto mb-4 h-14 w-14 text-purple-400" />
           <h2 className="text-xl font-semibold text-white">No STL selected</h2>
           <p className="mt-2 max-w-md text-sm text-zinc-400">
-            Upload STL files, then select one from the library to preview it here.
+            Select an STL from the shared library to download a preview and view it here.
           </p>
         </div>
       </div>
@@ -195,7 +89,7 @@ function Viewer({ selected }) {
         </div>
 
         <a
-          href={selected.url}
+          href={selected.previewUrl}
           download={selected.name}
           className="inline-flex items-center gap-2 rounded-xl bg-zinc-800 px-3 py-2 text-sm text-zinc-100 hover:bg-zinc-700"
         >
@@ -219,7 +113,7 @@ function Viewer({ selected }) {
               </Html>
             }
           >
-            <STLModel url={selected.url} />
+            <STLModel url={selected.previewUrl} />
           </React.Suspense>
 
           <Grid
@@ -237,74 +131,140 @@ function Viewer({ selected }) {
   );
 }
 
-export default function STLStorageOrganizerViewer() {
+export default function App() {
   const fileInputRef = useRef(null);
 
+  const [session, setSession] = useState(null);
+  const [email, setEmail] = useState("");
+  const [authMessage, setAuthMessage] = useState("");
   const [files, setFiles] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
+  const [selectedPreviewUrl, setSelectedPreviewUrl] = useState(null);
   const [query, setQuery] = useState("");
   const [folderFilter, setFolderFilter] = useState("All");
-  const [newFolder, setNewFolder] = useState("");
-  const [folders, setFolders] = useState(DEFAULT_FOLDERS);
+  const [browserFolder, setBrowserFolder] = useState("All");
   const [activeFolder, setActiveFolder] = useState("Unsorted");
+  const [newFolder, setNewFolder] = useState("");
   const [tagInput, setTagInput] = useState("");
-  const [isLoadingLibrary, setIsLoadingLibrary] = useState(true);
-  const [storageMessage, setStorageMessage] = useState("Loading local library...");
+  const [sortMode, setSortMode] = useState("newest");
   const [renamingId, setRenamingId] = useState(null);
   const [renameValue, setRenameValue] = useState("");
   const [editingFolder, setEditingFolder] = useState(null);
   const [folderEditValue, setFolderEditValue] = useState("");
-  const [sortMode, setSortMode] = useState("newest");
-  const [browserFolder, setBrowserFolder] = useState("All");
+  const [status, setStatus] = useState("Connect Supabase to enable the shared cloud library.");
+  const [isLoading, setIsLoading] = useState(false);
+
+  const user = session?.user || null;
 
   useEffect(() => {
-    let mounted = true;
+    if (!supabase) return;
 
-    async function loadLibrary() {
-      try {
-        const [storedFiles, storedFolders] = await Promise.all([
-          getAllStoredFiles(),
-          getStoredFolders(),
-        ]);
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session);
+    });
 
-        if (!mounted) return;
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      setSession(newSession);
+    });
 
-        setFolders(storedFolders);
-
-        setFiles(
-          storedFiles
-            .map(createFileView)
-            .sort((a, b) => new Date(b.uploadedAt) - new Date(a.uploadedAt))
-        );
-
-        setStorageMessage(
-          "IndexedDB storage active. Files persist in this browser after refresh."
-        );
-      } catch (error) {
-        console.error(error);
-        setStorageMessage("IndexedDB could not be loaded in this browser.");
-      } finally {
-        if (mounted) setIsLoadingLibrary(false);
-      }
-    }
-
-    loadLibrary();
-
-    return () => {
-      mounted = false;
-      setFiles((current) => {
-        current.forEach((file) => file.url && URL.revokeObjectURL(file.url));
-        return current;
-      });
-    };
+    return () => subscription.unsubscribe();
   }, []);
 
-  const selected = files.find((file) => file.id === selectedId) || null;
+  useEffect(() => {
+    if (!supabase || !session) return;
+    loadCloudLibrary();
+
+    const channel = supabase
+      .channel("stl-files-live")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "stl_files" },
+        () => loadCloudLibrary()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [session]);
+
+  useEffect(() => {
+    return () => {
+      if (selectedPreviewUrl) URL.revokeObjectURL(selectedPreviewUrl);
+    };
+  }, [selectedPreviewUrl]);
+
+  async function signInWithMagicLink() {
+    if (!supabase) {
+      setAuthMessage("Supabase is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.");
+      return;
+    }
+
+    if (!email.trim()) return;
+
+    const { error } = await supabase.auth.signInWithOtp({
+      email: email.trim(),
+      options: {
+        emailRedirectTo: window.location.origin,
+      },
+    });
+
+    if (error) {
+      setAuthMessage(error.message);
+    } else {
+      setAuthMessage("Check your email for the sign-in link.");
+    }
+  }
+
+  async function signOut() {
+    if (!supabase) return;
+    await supabase.auth.signOut();
+    setFiles([]);
+    setSelectedId(null);
+    setSelectedPreviewUrl(null);
+    setStatus("Signed out.");
+  }
+
+  async function loadCloudLibrary() {
+    if (!supabase) return;
+
+    setIsLoading(true);
+
+    const { data, error } = await supabase
+      .from("stl_files")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      setStatus(`Could not load shared library: ${error.message}`);
+    } else {
+      setFiles(data || []);
+      setStatus("Shared cloud library loaded.");
+    }
+
+    setIsLoading(false);
+  }
+
+  const folders = useMemo(() => {
+    const folderSet = new Set(DEFAULT_FOLDERS);
+    files.forEach((file) => folderSet.add(file.folder || "Unsorted"));
+    return Array.from(folderSet);
+  }, [files]);
+
+  const selected = useMemo(() => {
+    const file = files.find((item) => item.id === selectedId);
+    if (!file) return null;
+    return {
+      ...file,
+      previewUrl: selectedPreviewUrl,
+    };
+  }, [files, selectedId, selectedPreviewUrl]);
 
   const libraryStats = useMemo(() => {
-    const totalSize = files.reduce((sum, file) => sum + file.size, 0);
-    const folderCount = new Set(files.map((file) => file.folder)).size;
-
+    const totalSize = files.reduce((sum, file) => sum + Number(file.size || 0), 0);
+    const folderCount = new Set(files.map((file) => file.folder || "Unsorted")).size;
     return {
       totalSize,
       folderCount,
@@ -327,12 +287,13 @@ export default function STLStorageOrganizerViewer() {
     const activeFilter = browserFolder !== "All" ? browserFolder : folderFilter;
 
     const result = files.filter((file) => {
+      const tags = Array.isArray(file.tags) ? file.tags : [];
       const matchesFolder = activeFilter === "All" || file.folder === activeFilter;
-
       const matchesQuery =
         !q ||
         file.name.toLowerCase().includes(q) ||
-        file.tags.some((tag) => tag.toLowerCase().includes(q));
+        tags.some((tag) => tag.toLowerCase().includes(q)) ||
+        (file.uploader_email || "").toLowerCase().includes(q);
 
       return matchesFolder && matchesQuery;
     });
@@ -340,63 +301,203 @@ export default function STLStorageOrganizerViewer() {
     return [...result].sort((a, b) => {
       if (sortMode === "nameAsc") return a.name.localeCompare(b.name);
       if (sortMode === "nameDesc") return b.name.localeCompare(a.name);
-      if (sortMode === "sizeDesc") return b.size - a.size;
-      if (sortMode === "sizeAsc") return a.size - b.size;
-      if (sortMode === "oldest") return new Date(a.uploadedAt) - new Date(b.uploadedAt);
-
-      return new Date(b.uploadedAt) - new Date(a.uploadedAt);
+      if (sortMode === "sizeDesc") return Number(b.size || 0) - Number(a.size || 0);
+      if (sortMode === "sizeAsc") return Number(a.size || 0) - Number(b.size || 0);
+      if (sortMode === "oldest") return new Date(a.created_at) - new Date(b.created_at);
+      return new Date(b.created_at) - new Date(a.created_at);
     });
   }, [files, folderFilter, browserFolder, query, sortMode]);
 
   async function handleUpload(event) {
+    if (!supabase || !user) {
+      setStatus("Sign in first to upload to the shared library.");
+      return;
+    }
+
     const incoming = Array.from(event.target.files || []).filter((file) =>
       file.name.toLowerCase().endsWith(".stl")
     );
 
-    const next = incoming.map((file) => ({
-      id: crypto.randomUUID(),
-      name: file.name,
-      size: file.size,
-      folder: activeFolder,
-      tags: [],
-      uploadedAt: new Date().toISOString(),
-      blob: file,
-    }));
+    if (incoming.length === 0) return;
 
-    try {
-      await Promise.all(next.map(saveStoredFile));
+    setIsLoading(true);
 
-      const viewFiles = next.map(createFileView);
+    for (const file of incoming) {
+      const id = crypto.randomUUID();
+      const safeName = file.name.replace(/[^\w.\- ()]/g, "_");
+      const storagePath = `${user.id}/${id}-${safeName}`;
 
-      setFiles((current) => [...viewFiles, ...current]);
+      const uploadResult = await supabase.storage
+        .from(STORAGE_BUCKET)
+        .upload(storagePath, file, {
+          cacheControl: "3600",
+          upsert: false,
+          contentType: "model/stl",
+        });
 
-      if (viewFiles[0]) setSelectedId(viewFiles[0].id);
+      if (uploadResult.error) {
+        setStatus(`Upload failed for ${file.name}: ${uploadResult.error.message}`);
+        continue;
+      }
 
-      setStorageMessage(
-        `${next.length} STL file${next.length === 1 ? "" : "s"} saved to IndexedDB.`
-      );
-    } catch (error) {
-      console.error(error);
-      setStorageMessage("Upload failed. Browser storage may be full or unavailable.");
+      const insertResult = await supabase.from("stl_files").insert({
+        id,
+        name: file.name,
+        folder: activeFolder || "Unsorted",
+        tags: [],
+        size: file.size,
+        storage_path: storagePath,
+        owner_id: user.id,
+        uploader_email: user.email,
+      });
+
+      if (insertResult.error) {
+        setStatus(`Metadata save failed for ${file.name}: ${insertResult.error.message}`);
+      } else {
+        setStatus(`${file.name} uploaded to shared library.`);
+      }
     }
 
     event.target.value = "";
+    await loadCloudLibrary();
+    setIsLoading(false);
+  }
+
+  async function previewFile(file) {
+    if (!supabase) return;
+
+    setSelectedId(file.id);
+    setStatus(`Downloading preview for ${file.name}...`);
+
+    const { data, error } = await supabase.storage
+      .from(STORAGE_BUCKET)
+      .download(file.storage_path);
+
+    if (error) {
+      setStatus(`Preview download failed: ${error.message}`);
+      return;
+    }
+
+    if (selectedPreviewUrl) URL.revokeObjectURL(selectedPreviewUrl);
+
+    const objectUrl = URL.createObjectURL(data);
+    setSelectedPreviewUrl(objectUrl);
+    setStatus(`Preview loaded: ${file.name}`);
+  }
+
+  async function deleteFile(file) {
+    if (!supabase || !user) return;
+
+    const confirmed = window.confirm(`Delete "${file.name}" from the shared library?`);
+    if (!confirmed) return;
+
+    const storageResult = await supabase.storage
+      .from(STORAGE_BUCKET)
+      .remove([file.storage_path]);
+
+    if (storageResult.error) {
+      setStatus(`Storage delete failed: ${storageResult.error.message}`);
+      return;
+    }
+
+    const dbResult = await supabase.from("stl_files").delete().eq("id", file.id);
+
+    if (dbResult.error) {
+      setStatus(`Database delete failed: ${dbResult.error.message}`);
+      return;
+    }
+
+    if (selectedId === file.id) {
+      setSelectedId(null);
+      if (selectedPreviewUrl) URL.revokeObjectURL(selectedPreviewUrl);
+      setSelectedPreviewUrl(null);
+    }
+
+    setStatus(`Deleted ${file.name}.`);
+    await loadCloudLibrary();
+  }
+
+  async function updateFileRecord(id, updates, successMessage) {
+    if (!supabase) return;
+
+    const { error } = await supabase
+      .from("stl_files")
+      .update({ ...updates, updated_at: new Date().toISOString() })
+      .eq("id", id);
+
+    if (error) {
+      setStatus(error.message);
+      return false;
+    }
+
+    setStatus(successMessage);
+    await loadCloudLibrary();
+    return true;
+  }
+
+  async function moveFile(id, folder) {
+    await updateFileRecord(id, { folder }, "File moved.");
+  }
+
+  function startRenaming(file) {
+    setRenamingId(file.id);
+    setRenameValue(file.name.replace(/\.stl$/i, ""));
+  }
+
+  async function saveRename(id) {
+    const cleanName = renameValue.trim();
+    if (!cleanName) return;
+
+    const finalName = cleanName.toLowerCase().endsWith(".stl")
+      ? cleanName
+      : `${cleanName}.stl`;
+
+    const ok = await updateFileRecord(id, { name: finalName }, "File renamed.");
+    if (ok) {
+      setRenamingId(null);
+      setRenameValue("");
+    }
+  }
+
+  function cancelRename() {
+    setRenamingId(null);
+    setRenameValue("");
+  }
+
+  async function addTagToSelected() {
+    if (!selected) return;
+
+    const tag = tagInput.trim();
+    if (!tag) return;
+
+    const tags = Array.isArray(selected.tags) ? selected.tags : [];
+    if (tags.includes(tag)) return;
+
+    const ok = await updateFileRecord(
+      selected.id,
+      { tags: [...tags, tag] },
+      "Tag added."
+    );
+
+    if (ok) setTagInput("");
+  }
+
+  async function removeTag(file, tag) {
+    const tags = Array.isArray(file.tags) ? file.tags : [];
+    await updateFileRecord(
+      file.id,
+      { tags: tags.filter((item) => item !== tag) },
+      "Tag removed."
+    );
   }
 
   async function addFolder() {
     const folder = newFolder.trim();
-
     if (!folder || folders.includes(folder)) return;
 
-    const nextFolders = [...folders, folder];
-
-    setFolders(nextFolders);
     setActiveFolder(folder);
     setNewFolder("");
-
-    await saveStoredFolders(nextFolders);
-
-    setStorageMessage(`Folder "${folder}" created.`);
+    setStatus(`Folder "${folder}" ready. Upload or move a file into it to keep it in the shared library.`);
   }
 
   function startEditingFolder(folder) {
@@ -411,28 +512,17 @@ export default function STLStorageOrganizerViewer() {
 
   async function saveFolderEdit(oldFolder) {
     const newName = folderEditValue.trim();
+    if (!newName || newName === oldFolder) return;
 
-    if (!newName || folders.includes(newName)) return;
+    const { error } = await supabase
+      .from("stl_files")
+      .update({ folder: newName, updated_at: new Date().toISOString() })
+      .eq("folder", oldFolder);
 
-    const nextFolders = folders.map((folder) =>
-      folder === oldFolder ? newName : folder
-    );
-
-    const updatedFiles = files.map((file) =>
-      file.folder === oldFolder ? { ...file, folder: newName } : file
-    );
-
-    await saveStoredFolders(nextFolders);
-
-    await Promise.all(
-      updatedFiles.map((file) => {
-        const { url, ...storedRecord } = file;
-        return saveStoredFile(storedRecord);
-      })
-    );
-
-    setFolders(nextFolders);
-    setFiles(updatedFiles);
+    if (error) {
+      setStatus(error.message);
+      return;
+    }
 
     if (activeFolder === oldFolder) setActiveFolder(newName);
     if (folderFilter === oldFolder) setFolderFilter(newName);
@@ -440,210 +530,65 @@ export default function STLStorageOrganizerViewer() {
 
     setEditingFolder(null);
     setFolderEditValue("");
-
-    setStorageMessage(`Folder renamed to "${newName}".`);
-  }
-
-  async function deleteAllFolders() {
-    const confirmed = window.confirm(
-      "Delete ALL folders including defaults? All files will be moved to a recreated Unsorted folder."
-    );
-
-    if (!confirmed) return;
-
-    const resetFolders = ["Unsorted"];
-
-    const updatedFiles = files.map((file) => ({
-      ...file,
-      folder: "Unsorted",
-    }));
-
-    await saveStoredFolders(resetFolders);
-
-    await Promise.all(
-      updatedFiles.map((file) => {
-        const { url, ...storedRecord } = file;
-        return saveStoredFile(storedRecord);
-      })
-    );
-
-    setFolders(resetFolders);
-    setFiles(updatedFiles);
-    setActiveFolder("Unsorted");
-    setFolderFilter("All");
-    setBrowserFolder("All");
-    setEditingFolder(null);
-    setFolderEditValue("");
-
-    setStorageMessage("All folders deleted. Files moved to Unsorted.");
+    setStatus(`Folder "${oldFolder}" renamed to "${newName}".`);
+    await loadCloudLibrary();
   }
 
   async function deleteFolder(folderToDelete) {
     const confirmed = window.confirm(
       `Delete folder "${folderToDelete}"? Files in this folder will be moved to Unsorted.`
     );
-
     if (!confirmed) return;
 
-    const nextFolders = folders.filter((folder) => folder !== folderToDelete);
-    const finalFolders = nextFolders.includes("Unsorted") ? nextFolders : ["Unsorted", ...nextFolders];
+    const { error } = await supabase
+      .from("stl_files")
+      .update({ folder: "Unsorted", updated_at: new Date().toISOString() })
+      .eq("folder", folderToDelete);
 
-    const updatedFiles = files.map((file) =>
-      file.folder === folderToDelete ? { ...file, folder: "Unsorted" } : file
-    );
-
-    await saveStoredFolders(finalFolders);
-
-    await Promise.all(
-      updatedFiles.map((file) => {
-        const { url, ...storedRecord } = file;
-        return saveStoredFile(storedRecord);
-      })
-    );
-
-    setFolders(finalFolders);
-    setFiles(updatedFiles);
+    if (error) {
+      setStatus(error.message);
+      return;
+    }
 
     if (activeFolder === folderToDelete) setActiveFolder("Unsorted");
     if (folderFilter === folderToDelete) setFolderFilter("All");
     if (browserFolder === folderToDelete) setBrowserFolder("All");
 
-    setEditingFolder(null);
-    setFolderEditValue("");
-
-    setStorageMessage(`Folder "${folderToDelete}" deleted. Files moved to Unsorted.`);
+    setStatus(`Folder "${folderToDelete}" deleted. Files moved to Unsorted.`);
+    await loadCloudLibrary();
   }
 
-  async function deleteFile(id) {
-    const target = files.find((file) => file.id === id);
-
-    if (target?.url) URL.revokeObjectURL(target.url);
-
-    await deleteStoredFile(id);
-
-    setFiles((current) => current.filter((file) => file.id !== id));
-
-    if (selectedId === id) setSelectedId(null);
-
-    setStorageMessage("File removed from IndexedDB.");
-  }
-
-  async function moveFile(id, folder) {
-    const target = files.find((file) => file.id === id);
-
-    if (!target) return;
-
-    const updated = { ...target, folder };
-    const { url, ...storedRecord } = updated;
-
-    await saveStoredFile(storedRecord);
-
-    setFiles((current) =>
-      current.map((file) => (file.id === id ? updated : file))
-    );
-  }
-
-  function startRenaming(file) {
-    setRenamingId(file.id);
-    setRenameValue(file.name.replace(/\.stl$/i, ""));
-  }
-
-  async function saveRename(id) {
-    const target = files.find((file) => file.id === id);
-
-    if (!target) return;
-
-    const cleanName = renameValue.trim();
-
-    if (!cleanName) return;
-
-    const finalName = cleanName.toLowerCase().endsWith(".stl")
-      ? cleanName
-      : `${cleanName}.stl`;
-
-    const updated = { ...target, name: finalName };
-    const { url, ...storedRecord } = updated;
-
-    await saveStoredFile(storedRecord);
-
-    setFiles((current) =>
-      current.map((file) => (file.id === id ? updated : file))
-    );
-
-    setRenamingId(null);
-    setRenameValue("");
-    setStorageMessage("File renamed and saved to IndexedDB.");
-  }
-
-  function cancelRename() {
-    setRenamingId(null);
-    setRenameValue("");
-  }
-
-  async function addTagToSelected() {
-    const tag = tagInput.trim();
-
-    if (!tag || !selected || selected.tags.includes(tag)) return;
-
-    const updated = {
-      ...selected,
-      tags: [...selected.tags, tag],
-    };
-
-    const { url, ...storedRecord } = updated;
-
-    await saveStoredFile(storedRecord);
-
-    setFiles((current) =>
-      current.map((file) => (file.id === selected.id ? updated : file))
-    );
-
-    setTagInput("");
-  }
-
-  async function removeTag(fileId, tag) {
-    const target = files.find((file) => file.id === fileId);
-
-    if (!target) return;
-
-    const updated = {
-      ...target,
-      tags: target.tags.filter((t) => t !== tag),
-    };
-
-    const { url, ...storedRecord } = updated;
-
-    await saveStoredFile(storedRecord);
-
-    setFiles((current) =>
-      current.map((file) => (file.id === fileId ? updated : file))
-    );
-  }
-
-  async function clearLibrary() {
+  async function deleteAllFolders() {
     const confirmed = window.confirm(
-      "This will permanently remove all STL files from this browser's IndexedDB storage. Continue?"
+      "Delete all folders? All files will be moved to Unsorted."
     );
-
     if (!confirmed) return;
 
-    await clearStoredFiles();
+    const { error } = await supabase
+      .from("stl_files")
+      .update({ folder: "Unsorted", updated_at: new Date().toISOString() })
+      .neq("folder", "Unsorted");
 
-    files.forEach((file) => file.url && URL.revokeObjectURL(file.url));
+    if (error) {
+      setStatus(error.message);
+      return;
+    }
 
-    setFiles([]);
-    setSelectedId(null);
-    setStorageMessage("Local IndexedDB library cleared.");
+    setActiveFolder("Unsorted");
+    setFolderFilter("All");
+    setBrowserFolder("All");
+    setStatus("All folders removed. Files moved to Unsorted.");
+    await loadCloudLibrary();
   }
 
   return (
     <div className="min-h-screen bg-zinc-950 p-4 text-zinc-100 md:p-8">
       <div className="mx-auto max-w-7xl">
-        <header className="mb-6 grid gap-4 rounded-3xl border border-zinc-800 bg-gradient-to-br from-zinc-900 to-zinc-950 p-6 shadow-2xl md:grid-cols-[1fr_auto] md:items-center">
+        <header className="mb-6 grid gap-4 rounded-3xl border border-zinc-800 bg-gradient-to-br from-zinc-900 to-zinc-950 p-6 shadow-2xl lg:grid-cols-[1fr_auto] lg:items-center">
           <div>
             <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-purple-500/30 bg-purple-500/10 px-3 py-1 text-xs font-medium text-purple-200">
               <Archive className="h-3.5 w-3.5" />
-              Local STL Library
+              Shared Cloud STL Library
             </div>
 
             <h1 className="text-3xl font-bold tracking-tight text-white md:text-4xl">
@@ -651,27 +596,49 @@ export default function STLStorageOrganizerViewer() {
             </h1>
 
             <p className="mt-2 max-w-2xl text-sm text-zinc-400">
-              Upload STL files, organize them by folder and tags, search your collection,
-              rename files, and preview models in a built-in 3D viewer.
+              Multi-user STL uploads, downloads, shared cloud storage, folders, tags,
+              search, sorting, and 3D previews.
             </p>
           </div>
 
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-purple-600 px-5 py-3 font-semibold text-white shadow-lg shadow-purple-950/40 hover:bg-purple-500"
-          >
-            <Upload className="h-5 w-5" />
-            Upload STL Files
-          </button>
-
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".stl"
-            multiple
-            onChange={handleUpload}
-            className="hidden"
-          />
+          <div className="rounded-2xl border border-zinc-800 bg-zinc-950/80 p-3">
+            {!supabase ? (
+              <p className="max-w-sm text-xs text-red-300">
+                Supabase is not configured. Add your environment variables to enable
+                the persistent shared library.
+              </p>
+            ) : user ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-xl border border-zinc-800 px-3 py-2 text-xs text-zinc-300">
+                  {user.email}
+                </span>
+                <button
+                  onClick={signOut}
+                  className="inline-flex items-center gap-2 rounded-xl bg-zinc-800 px-3 py-2 text-sm text-white hover:bg-zinc-700"
+                >
+                  <LogOut className="h-4 w-4" />
+                  Sign Out
+                </button>
+              </div>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                <input
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  placeholder="email@example.com"
+                  className="rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-white outline-none placeholder:text-zinc-600"
+                />
+                <button
+                  onClick={signInWithMagicLink}
+                  className="inline-flex items-center gap-2 rounded-xl bg-purple-600 px-3 py-2 text-sm font-semibold text-white hover:bg-purple-500"
+                >
+                  <LogIn className="h-4 w-4" />
+                  Sign In
+                </button>
+                {authMessage && <p className="basis-full text-xs text-purple-200">{authMessage}</p>}
+              </div>
+            )}
+          </div>
         </header>
 
         <section className="mb-6 grid gap-4 md:grid-cols-4">
@@ -688,9 +655,7 @@ export default function STLStorageOrganizerViewer() {
               <FolderPlus className="h-5 w-5 text-purple-300" />
               <span className="text-sm text-zinc-400">Active Folders</span>
             </div>
-            <p className="mt-2 text-2xl font-bold text-white">
-              {libraryStats.folderCount || 0}
-            </p>
+            <p className="mt-2 text-2xl font-bold text-white">{libraryStats.folderCount || 0}</p>
           </div>
 
           <div className="rounded-2xl border border-zinc-800 bg-zinc-900/80 p-4">
@@ -698,25 +663,41 @@ export default function STLStorageOrganizerViewer() {
               <Box className="h-5 w-5 text-purple-300" />
               <span className="text-sm text-zinc-400">Library Size</span>
             </div>
-            <p className="mt-2 text-2xl font-bold text-white">
-              {formatBytes(libraryStats.totalSize)}
-            </p>
+            <p className="mt-2 text-2xl font-bold text-white">{formatBytes(libraryStats.totalSize)}</p>
           </div>
 
           <div className="rounded-2xl border border-zinc-800 bg-zinc-900/80 p-4">
             <div className="flex items-center gap-3">
-              <Database className="h-5 w-5 text-purple-300" />
+              <Cloud className="h-5 w-5 text-purple-300" />
               <span className="text-sm text-zinc-400">Storage Mode</span>
             </div>
-            <p className="mt-2 text-sm font-semibold text-white">IndexedDB</p>
+            <p className="mt-2 text-sm font-semibold text-white">Supabase Cloud</p>
           </div>
         </section>
 
-        <main className="grid gap-6 lg:grid-cols-[420px_1fr]">
+        <main className="grid gap-6 lg:grid-cols-[440px_1fr]">
           <aside className="rounded-2xl border border-zinc-800 bg-zinc-900/80 p-4 shadow-xl">
             <div className="mb-4 rounded-xl border border-purple-500/20 bg-purple-500/10 p-3 text-xs text-purple-100">
-              {isLoadingLibrary ? "Loading saved STL files..." : storageMessage}
+              {isLoading ? "Loading..." : status}
             </div>
+
+            <button
+              disabled={!user}
+              onClick={() => fileInputRef.current?.click()}
+              className="mb-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-purple-600 px-5 py-3 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40 hover:bg-purple-500"
+            >
+              <Upload className="h-5 w-5" />
+              Upload STL Files
+            </button>
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".stl"
+              multiple
+              onChange={handleUpload}
+              className="hidden"
+            />
 
             <div className="mb-4 rounded-2xl border border-zinc-800 bg-zinc-950/60 p-3">
               <div className="mb-3 flex items-center gap-2">
@@ -729,7 +710,7 @@ export default function STLStorageOrganizerViewer() {
                 <input
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
-                  placeholder="Search by name or tag..."
+                  placeholder="Search by name, tag, or uploader..."
                   className="w-full bg-transparent text-sm text-zinc-100 outline-none placeholder:text-zinc-600"
                 />
               </div>
@@ -815,6 +796,7 @@ export default function STLStorageOrganizerViewer() {
                 placeholder="New folder"
                 className="min-w-0 flex-1 rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm outline-none placeholder:text-zinc-600"
               />
+
               <button
                 onClick={addFolder}
                 className="rounded-xl bg-zinc-800 px-3 py-2 hover:bg-zinc-700"
@@ -826,12 +808,12 @@ export default function STLStorageOrganizerViewer() {
             <div className="mb-4 rounded-2xl border border-zinc-800 bg-zinc-950/60 p-3">
               <div className="mb-2 flex items-center justify-between gap-2">
                 <h3 className="text-sm font-semibold text-white">Manage Folders</h3>
-
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-zinc-500">edit / delete</span>
                   <button
+                    disabled={!user}
                     onClick={deleteAllFolders}
-                    className="rounded-lg border border-red-500/30 bg-red-500/10 px-2 py-1 text-[10px] font-semibold text-red-300 hover:bg-red-500/20"
+                    className="rounded-lg border border-red-500/30 bg-red-500/10 px-2 py-1 text-[10px] font-semibold text-red-300 disabled:cursor-not-allowed disabled:opacity-40 hover:bg-red-500/20"
                   >
                     Delete All
                   </button>
@@ -856,12 +838,14 @@ export default function STLStorageOrganizerViewer() {
                           autoFocus
                           className="min-w-0 flex-1 rounded-lg border border-purple-500/40 bg-zinc-950 px-2 py-1 text-xs text-white outline-none"
                         />
+
                         <button
                           onClick={() => saveFolderEdit(folder)}
                           className="rounded-lg p-1 text-green-300 hover:bg-green-500/10"
                         >
                           <Check className="h-3.5 w-3.5" />
                         </button>
+
                         <button
                           onClick={cancelFolderEdit}
                           className="rounded-lg p-1 text-zinc-400 hover:bg-zinc-800"
@@ -874,15 +858,19 @@ export default function STLStorageOrganizerViewer() {
                         <span className="min-w-0 flex-1 truncate text-xs text-zinc-200">
                           {folder}
                         </span>
+
                         <button
+                          disabled={!user}
                           onClick={() => startEditingFolder(folder)}
-                          className="rounded-lg p-1 text-zinc-500 hover:bg-purple-500/10 hover:text-purple-300"
+                          className="rounded-lg p-1 text-zinc-500 disabled:cursor-not-allowed disabled:opacity-40 hover:bg-purple-500/10 hover:text-purple-300"
                         >
                           <Pencil className="h-3.5 w-3.5" />
                         </button>
+
                         <button
+                          disabled={!user}
                           onClick={() => deleteFolder(folder)}
-                          className="rounded-lg p-1 text-zinc-500 hover:bg-red-500/10 hover:text-red-300"
+                          className="rounded-lg p-1 text-zinc-500 disabled:cursor-not-allowed disabled:opacity-40 hover:bg-red-500/10 hover:text-red-300"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>
@@ -894,18 +882,8 @@ export default function STLStorageOrganizerViewer() {
             </div>
 
             <div className="mb-3 flex items-center justify-between">
-              <h2 className="font-semibold text-white">Library</h2>
-              <div className="flex items-center gap-3">
-                <span className="text-xs text-zinc-500">{filteredFiles.length} shown</span>
-                {files.length > 0 && (
-                  <button
-                    onClick={clearLibrary}
-                    className="text-xs text-red-300 hover:text-red-200"
-                  >
-                    Clear All
-                  </button>
-                )}
-              </div>
+              <h2 className="font-semibold text-white">Shared Library</h2>
+              <span className="text-xs text-zinc-500">{filteredFiles.length} shown</span>
             </div>
 
             <div className="max-h-[640px] space-y-3 overflow-auto pr-1">
@@ -914,102 +892,115 @@ export default function STLStorageOrganizerViewer() {
                   No STL files found.
                 </div>
               ) : (
-                filteredFiles.map((file) => (
-                  <div
-                    key={file.id}
-                    className={`rounded-2xl border p-3 transition ${
-                      selectedId === file.id
-                        ? "border-purple-500 bg-purple-500/10"
-                        : "border-zinc-800 bg-zinc-950/70 hover:border-zinc-700"
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0 flex-1">
-                        {renamingId === file.id ? (
-                          <div className="flex items-center gap-2">
-                            <input
-                              value={renameValue}
-                              onChange={(event) => setRenameValue(event.target.value)}
-                              onKeyDown={(event) => {
-                                if (event.key === "Enter") saveRename(file.id);
-                                if (event.key === "Escape") cancelRename();
-                              }}
-                              autoFocus
-                              className="min-w-0 flex-1 rounded-lg border border-purple-500/40 bg-zinc-900 px-2 py-1.5 text-sm text-white outline-none"
-                            />
-                            <button
-                              onClick={() => saveRename(file.id)}
-                              className="rounded-lg p-1.5 text-green-300 hover:bg-green-500/10"
-                            >
-                              <Check className="h-4 w-4" />
-                            </button>
-                            <button
-                              onClick={cancelRename}
-                              className="rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-800"
-                            >
-                              <X className="h-4 w-4" />
-                            </button>
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => setSelectedId(file.id)}
-                            className="min-w-0 text-left"
-                          >
+                filteredFiles.map((file) => {
+                  const tags = Array.isArray(file.tags) ? file.tags : [];
+                  return (
+                    <div
+                      key={file.id}
+                      className={`rounded-2xl border p-3 transition ${
+                        selectedId === file.id
+                          ? "border-purple-500 bg-purple-500/10"
+                          : "border-zinc-800 bg-zinc-950/70 hover:border-zinc-700"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          {renamingId === file.id ? (
                             <div className="flex items-center gap-2">
-                              <Eye className="h-4 w-4 shrink-0 text-purple-300" />
-                              <p className="truncate font-medium text-white">{file.name}</p>
+                              <input
+                                value={renameValue}
+                                onChange={(event) => setRenameValue(event.target.value)}
+                                onKeyDown={(event) => {
+                                  if (event.key === "Enter") saveRename(file.id);
+                                  if (event.key === "Escape") cancelRename();
+                                }}
+                                autoFocus
+                                className="min-w-0 flex-1 rounded-lg border border-purple-500/40 bg-zinc-900 px-2 py-1.5 text-sm text-white outline-none"
+                              />
+
+                              <button
+                                onClick={() => saveRename(file.id)}
+                                className="rounded-lg p-1.5 text-green-300 hover:bg-green-500/10"
+                              >
+                                <Check className="h-4 w-4" />
+                              </button>
+
+                              <button
+                                onClick={cancelRename}
+                                className="rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-800"
+                              >
+                                <X className="h-4 w-4" />
+                              </button>
                             </div>
-                            <p className="mt-1 text-xs text-zinc-500">
-                              {file.folder} · {formatBytes(file.size)}
-                            </p>
-                          </button>
-                        )}
-                      </div>
+                          ) : (
+                            <button
+                              onClick={() => previewFile(file)}
+                              className="min-w-0 text-left"
+                            >
+                              <div className="flex items-center gap-2">
+                                <Eye className="h-4 w-4 shrink-0 text-purple-300" />
+                                <p className="truncate font-medium text-white">{file.name}</p>
+                              </div>
+                              <p className="mt-1 text-xs text-zinc-500">
+                                {file.folder} · {formatBytes(file.size)}
+                              </p>
+                              <p className="mt-1 truncate text-[10px] text-zinc-600">
+                                Uploaded by {file.uploader_email || "unknown"}
+                              </p>
+                            </button>
+                          )}
+                        </div>
 
-                      <div className="flex shrink-0 items-center gap-1">
-                        <button
-                          onClick={() => startRenaming(file)}
-                          className="rounded-lg p-1.5 text-zinc-500 hover:bg-purple-500/10 hover:text-purple-300"
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => deleteFile(file.id)}
-                          className="rounded-lg p-1.5 text-zinc-500 hover:bg-red-500/10 hover:text-red-300"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="mt-3 flex items-center gap-2">
-                      <select
-                        value={file.folder}
-                        onChange={(event) => moveFile(file.id, event.target.value)}
-                        className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-2 py-1.5 text-xs text-zinc-300"
-                      >
-                        {folders.map((folder) => (
-                          <option key={folder}>{folder}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {file.tags.length > 0 && (
-                      <div className="mt-3 flex flex-wrap gap-1.5">
-                        {file.tags.map((tag) => (
+                        <div className="flex shrink-0 items-center gap-1">
                           <button
-                            key={tag}
-                            onClick={() => removeTag(file.id, tag)}
-                            className="inline-flex items-center gap-1 rounded-full bg-zinc-800 px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-700"
+                            disabled={!user}
+                            onClick={() => startRenaming(file)}
+                            className="rounded-lg p-1.5 text-zinc-500 disabled:cursor-not-allowed disabled:opacity-40 hover:bg-purple-500/10 hover:text-purple-300"
                           >
-                            {tag}
-                            <X className="h-3 w-3" />
+                            <Pencil className="h-4 w-4" />
                           </button>
-                        ))}
+
+                          <button
+                            disabled={!user}
+                            onClick={() => deleteFile(file)}
+                            className="rounded-lg p-1.5 text-zinc-500 disabled:cursor-not-allowed disabled:opacity-40 hover:bg-red-500/10 hover:text-red-300"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
                       </div>
-                    )}
-                  </div>
-                ))
+
+                      <div className="mt-3 flex items-center gap-2">
+                        <select
+                          value={file.folder}
+                          disabled={!user}
+                          onChange={(event) => moveFile(file.id, event.target.value)}
+                          className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-2 py-1.5 text-xs text-zinc-300 disabled:opacity-50"
+                        >
+                          {folders.map((folder) => (
+                            <option key={folder}>{folder}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {tags.length > 0 && (
+                        <div className="mt-3 flex flex-wrap gap-1.5">
+                          {tags.map((tag) => (
+                            <button
+                              key={tag}
+                              disabled={!user}
+                              onClick={() => removeTag(file, tag)}
+                              className="inline-flex items-center gap-1 rounded-full bg-zinc-800 px-2 py-1 text-xs text-zinc-300 disabled:opacity-50 hover:bg-zinc-700"
+                            >
+                              {tag}
+                              <X className="h-3 w-3" />
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
               )}
             </div>
           </aside>
@@ -1028,7 +1019,7 @@ export default function STLStorageOrganizerViewer() {
                   value={tagInput}
                   onChange={(event) => setTagInput(event.target.value)}
                   onKeyDown={(event) => event.key === "Enter" && addTagToSelected()}
-                  disabled={!selected}
+                  disabled={!selected || !user}
                   placeholder={
                     selected
                       ? "Add tags like 28mm, terrain, infantry..."
@@ -1038,7 +1029,7 @@ export default function STLStorageOrganizerViewer() {
                 />
 
                 <button
-                  disabled={!selected}
+                  disabled={!selected || !user}
                   onClick={addTagToSelected}
                   className="rounded-xl bg-purple-600 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40 hover:bg-purple-500"
                 >
@@ -1047,8 +1038,8 @@ export default function STLStorageOrganizerViewer() {
               </div>
 
               <p className="mt-3 text-xs text-zinc-500">
-                IndexedDB keeps files on this device and browser. Files persist after refresh,
-                but they do not sync across devices and are not uploaded to Vercel, GitHub, or any server.
+                This build uses Supabase for multi-user persistent cloud storage.
+                Configure the Supabase URL, anon key, database table, and storage bucket before deployment.
               </p>
             </div>
           </section>

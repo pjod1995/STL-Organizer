@@ -1,42 +1,74 @@
-# STL Storage Organizer
+# STL Storage Organizer Shared Cloud Library
 
-A local browser-based STL storage, organizer, and viewer.
+This version uses Supabase for a persistent multi-user STL library.
 
 ## Features
 
-- Upload multiple STL files
-- View STL files in a 3D viewer
-- Orbit controls
-- IndexedDB local browser storage
-- Files persist after refresh
-- Download stored STL files
-- Delete individual STL files
-- Clear full library
-- Create folders
+- Multi-user email magic-link sign-in
+- Shared persistent STL library
+- Upload STL files to Supabase Storage
+- Download and preview STL files from cloud storage
+- 3D STL viewer with orbit controls
+- Shared folders
 - Rename folders
-- Delete any folder, including defaults
+- Delete folders
 - Delete all folders
-- Automatic fallback Unsorted folder
 - Move files between folders
-- Rename files inline
-- Add and remove tags
-- Search by file name or tag
-- Library browser with folder counts
+- Rename STL files
+- Delete STL files
+- Add/remove tags
+- Search by name, tag, or uploader
 - Sort by newest, oldest, name, or size
-- Library stats dashboard
+- Folder browser with counts
+- Shared cloud statistics
+
+## Supabase Setup
+
+1. Create a Supabase project.
+2. Create a private storage bucket named:
+
+```txt
+stl-files
+```
+
+3. Open Supabase SQL Editor.
+4. Run the SQL in:
+
+```txt
+supabase-schema.sql
+```
+
+5. In Supabase Auth settings, enable email login / magic links.
+6. In your deployed site settings, add environment variables:
+
+```txt
+VITE_SUPABASE_URL=https://your-project-id.supabase.co
+VITE_SUPABASE_ANON_KEY=your-anon-key
+```
 
 ## Vercel Deploy Settings
 
-- Build command: `npm run build`
-- Output directory: `dist`
+Build command:
+
+```bash
+npm run build
+```
+
+Output directory:
+
+```txt
+dist
+```
 
 ## Local Development
+
+Copy `.env.example` to `.env`, fill in the values, then run:
 
 ```bash
 npm install
 npm run dev
 ```
 
-## Important
+## Permissions Note
 
-Files are stored locally in the browser with IndexedDB. They are not uploaded to GitHub, Vercel, or any server.
+The included SQL lets any signed-in user read, upload, edit, and delete shared library records. For a private club/store library, this is simple and collaborative. For production moderation, tighten the RLS policies to only allow owners/admins to delete.

@@ -16,11 +16,9 @@ function openDatabase() {
 
     request.onupgradeneeded = () => {
       const db = request.result;
-
       if (!db.objectStoreNames.contains(FILE_STORE)) {
         db.createObjectStore(FILE_STORE, { keyPath: "id" });
       }
-
       if (!db.objectStoreNames.contains(SETTINGS_STORE)) {
         db.createObjectStore(SETTINGS_STORE, { keyPath: "key" });
       }
@@ -33,12 +31,10 @@ function openDatabase() {
 
 async function getAllStoredFiles() {
   const db = await openDatabase();
-
   return new Promise((resolve, reject) => {
     const transaction = db.transaction(FILE_STORE, "readonly");
     const store = transaction.objectStore(FILE_STORE);
     const request = store.getAll();
-
     request.onsuccess = () => resolve(request.result || []);
     request.onerror = () => reject(request.error);
     transaction.oncomplete = () => db.close();
@@ -47,68 +43,10 @@ async function getAllStoredFiles() {
 
 async function saveStoredFile(fileRecord) {
   const db = await openDatabase();
-
   return new Promise((resolve, reject) => {
     const transaction = db.transaction(FILE_STORE, "readwrite");
     const store = transaction.objectStore(FILE_STORE);
     const request = store.put(fileRecord);
-
-    request.onsuccess = () => resolve();
-    request.onerror = () => reject(request.error);
-    transaction.oncomplete = () => db.close();
-  });
-}
-
-async function deleteStoredFile(id) {
-  const db = await openDatabase();
-
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(FILE_STORE, "readwrite");
-    const store = transaction.objectStore(FILE_STORE);
-    const request = store.delete(id);
-
-    request.onsuccess = () => resolve();
-    request.onerror = () => reject(request.error);
-    transaction.oncomplete = () => db.close();
-  });
-}
-
-async function clearStoredFiles() {
-  const db = await openDatabase();
-
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(FILE_STORE, "readwrite");
-    const store = transaction.objectStore(FILE_STORE);
-    const request = store.clear();
-
-    request.onsuccess = () => resolve();
-    request.onerror = () => reject(request.error);
-    transaction.oncomplete = () => db.close();
-  });
-}
-
-async function getStoredFolders() {
-  const db = await openDatabase();
-
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(SETTINGS_STORE, "readonly");
-    const store = transaction.objectStore(SETTINGS_STORE);
-    const request = store.get("folders");
-
-    request.onsuccess = () => resolve(request.result?.value || DEFAULT_FOLDERS);
-    request.onerror = () => reject(request.error);
-    transaction.oncomplete = () => db.close();
-  });
-}
-
-async function saveStoredFolders(folders) {
-  const db = await openDatabase();
-
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(SETTINGS_STORE, "readwrite");
-    const store = transaction.objectStore(SETTINGS_STORE);
-    const request = store.put({ key: "folders", value: folders });
-
     request.onsuccess = () => resolve();
     request.onerror = () => reject(request.error);
     transaction.oncomplete = () => db.close();
@@ -124,10 +62,8 @@ function createFileView(record) {
 
 function formatBytes(bytes) {
   if (!bytes) return "0 B";
-
   const sizes = ["B", "KB", "MB", "GB"];
   const i = Math.floor(Math.log(bytes) / Math.log(1024));
-
   return `${(bytes / Math.pow(1024, i)).toFixed(i === 0 ? 0 : 1)} ${sizes[i]}`;
 }
 
@@ -144,7 +80,7 @@ function STLModel({ url }) {
 
   return (
     <Center>
-      <mesh geometry={centeredGeometry} castShadow receiveShadow>
+      <mesh geometry={centeredGeometry}>
         <meshStandardMaterial color="#c7c7d1" roughness={0.42} metalness={0.08} />
       </mesh>
     </Center>
@@ -157,12 +93,7 @@ function Viewer({ selected }) {
       <div className="flex h-full min-h-[480px] items-center justify-center rounded-2xl border border-dashed border-zinc-700 bg-zinc-950/80 p-8 text-center">
         <div>
           <Box className="mx-auto mb-4 h-14 w-14 text-purple-400" />
-
           <h2 className="text-xl font-semibold text-white">No STL selected</h2>
-
-          <p className="mt-2 max-w-md text-sm text-zinc-400">
-            Upload STL files, then select one from the library to preview it here.
-          </p>
         </div>
       </div>
     );
@@ -173,49 +104,26 @@ function Viewer({ selected }) {
       <div className="flex items-center justify-between border-b border-zinc-800 px-4 py-3">
         <div>
           <h2 className="font-semibold text-white">{selected.name}</h2>
-
-          <p className="text-xs text-zinc-500">
-            {selected.folder} · {formatBytes(selected.size)}
-          </p>
+          <p className="text-xs text-zinc-500">{selected.folder} · {formatBytes(selected.size)}</p>
         </div>
 
-        <a
-          href={selected.url}
-          download={selected.name}
-          className="inline-flex items-center gap-2 rounded-xl bg-zinc-800 px-3 py-2 text-sm text-zinc-100 hover:bg-zinc-700"
-        >
+        <a href={selected.url} download={selected.name} className="inline-flex items-center gap-2 rounded-xl bg-zinc-800 px-3 py-2 text-sm text-zinc-100 hover:bg-zinc-700">
           <Download className="h-4 w-4" />
           Download
         </a>
       </div>
 
       <div className="h-[520px] w-full">
-        <Canvas camera={{ position: [85, 65, 85], fov: 45 }} shadows>
+        <Canvas camera={{ position: [85, 65, 85], fov: 45 }}>
           <ambientLight intensity={0.45} />
-          <directionalLight position={[8, 12, 8]} intensity={1.1} castShadow />
-          <directionalLight position={[-8, 4, -8]} intensity={0.45} />
+          <directionalLight position={[8, 12, 8]} intensity={1.1} />
 
-          <React.Suspense
-            fallback={
-              <Html center>
-                <div className="rounded-xl bg-zinc-900 px-4 py-2 text-sm text-white">
-                  Loading STL...
-                </div>
-              </Html>
-            }
-          >
+          <React.Suspense fallback={<Html center><div className="text-white">Loading STL...</div></Html>}>
             <STLModel url={selected.url} />
           </React.Suspense>
 
-          <Grid
-            infiniteGrid
-            sectionColor="#7c3aed"
-            cellColor="#3f3f46"
-            fadeDistance={420}
-            fadeStrength={2}
-          />
-
-          <OrbitControls makeDefault enableDamping dampingFactor={0.08} />
+          <Grid infiniteGrid sectionColor="#7c3aed" cellColor="#3f3f46" />
+          <OrbitControls makeDefault />
         </Canvas>
       </div>
     </div>
@@ -228,85 +136,26 @@ export default function App() {
   const [files, setFiles] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
   const [query, setQuery] = useState("");
-  const [folderFilter, setFolderFilter] = useState("All");
-  const [newFolder, setNewFolder] = useState("");
   const [folders, setFolders] = useState(DEFAULT_FOLDERS);
   const [activeFolder, setActiveFolder] = useState("Unsorted");
-  const [tagInput, setTagInput] = useState("");
-  const [isLoadingLibrary, setIsLoadingLibrary] = useState(true);
-  const [storageMessage, setStorageMessage] = useState("Loading local library...");
+  const [newFolder, setNewFolder] = useState("");
   const [renamingId, setRenamingId] = useState(null);
   const [renameValue, setRenameValue] = useState("");
 
   useEffect(() => {
-    let mounted = true;
-
     async function loadLibrary() {
-      try {
-        const [storedFiles, storedFolders] = await Promise.all([
-          getAllStoredFiles(),
-          getStoredFolders(),
-        ]);
-
-        if (!mounted) return;
-
-        setFolders(storedFolders);
-
-        setFiles(
-          storedFiles
-            .map(createFileView)
-            .sort((a, b) => new Date(b.uploadedAt) - new Date(a.uploadedAt))
-        );
-
-        setStorageMessage(
-          "IndexedDB storage active. Files persist in this browser after refresh."
-        );
-      } catch (error) {
-        console.error(error);
-        setStorageMessage("IndexedDB could not be loaded in this browser.");
-      } finally {
-        if (mounted) setIsLoadingLibrary(false);
-      }
+      const storedFiles = await getAllStoredFiles();
+      setFiles(storedFiles.map(createFileView));
     }
 
     loadLibrary();
-
-    return () => {
-      mounted = false;
-      setFiles((current) => {
-        current.forEach((file) => file.url && URL.revokeObjectURL(file.url));
-        return current;
-      });
-    };
   }, []);
 
-  const selected = files.find((f) => f.id === selectedId) || null;
+  const selected = files.find((f) => f.id === selectedId);
 
-  const libraryStats = useMemo(() => {
-    const totalSize = files.reduce((sum, file) => sum + file.size, 0);
-    const folderCount = new Set(files.map((file) => file.folder)).size;
-
-    return {
-      totalSize,
-      folderCount,
-      fileCount: files.length,
-    };
-  }, [files]);
-
-  const filteredFiles = useMemo(() => {
-    const q = query.trim().toLowerCase();
-
-    return files.filter((file) => {
-      const matchesFolder = folderFilter === "All" || file.folder === folderFilter;
-
-      const matchesQuery =
-        !q ||
-        file.name.toLowerCase().includes(q) ||
-        file.tags.some((tag) => tag.toLowerCase().includes(q));
-
-      return matchesFolder && matchesQuery;
-    });
-  }, [files, folderFilter, query]);
+  const filteredFiles = files.filter((file) =>
+    file.name.toLowerCase().includes(query.toLowerCase())
+  );
 
   async function handleUpload(event) {
     const incoming = Array.from(event.target.files || []).filter((file) =>
@@ -323,91 +172,35 @@ export default function App() {
       blob: file,
     }));
 
-    try {
-      await Promise.all(next.map(saveStoredFile));
+    await Promise.all(next.map(saveStoredFile));
 
-      const viewFiles = next.map(createFileView);
+    const viewFiles = next.map(createFileView);
 
-      setFiles((current) => [...viewFiles, ...current]);
+    setFiles((current) => [...viewFiles, ...current]);
 
-      if (viewFiles[0]) setSelectedId(viewFiles[0].id);
-
-      setStorageMessage(
-        `${next.length} STL file${next.length === 1 ? "" : "s"} saved to IndexedDB.`
-      );
-    } catch (error) {
-      console.error(error);
-      setStorageMessage("Upload failed. Browser storage may be full or unavailable.");
-    }
-
-    event.target.value = "";
+    if (viewFiles[0]) setSelectedId(viewFiles[0].id);
   }
 
   async function addFolder() {
-    const folder = newFolder.trim();
-
-    if (!folder || folders.includes(folder)) return;
-
-    const nextFolders = [...folders, folder];
-
-    setFolders(nextFolders);
-    setActiveFolder(folder);
+    if (!newFolder.trim()) return;
+    setFolders((current) => [...current, newFolder.trim()]);
     setNewFolder("");
-
-    await saveStoredFolders(nextFolders);
-  }
-
-  async function deleteFile(id) {
-    const target = files.find((file) => file.id === id);
-
-    if (target?.url) URL.revokeObjectURL(target.url);
-
-    await deleteStoredFile(id);
-
-    setFiles((current) => current.filter((file) => file.id !== id));
-
-    if (selectedId === id) setSelectedId(null);
-
-    setStorageMessage("File removed from IndexedDB.");
-  }
-
-  async function moveFile(id, folder) {
-    const target = files.find((file) => file.id === id);
-
-    if (!target) return;
-
-    const updated = { ...target, folder };
-    const { url, ...storedRecord } = updated;
-
-    await saveStoredFile(storedRecord);
-
-    setFiles((current) =>
-      current.map((file) => (file.id === id ? updated : file))
-    );
-  }
-
-  function startRenaming(file) {
-    setRenamingId(file.id);
-    setRenameValue(file.name.replace(/\.stl$/i, ""));
   }
 
   async function saveRename(id) {
     const target = files.find((file) => file.id === id);
-
     if (!target) return;
 
-    const cleanName = renameValue.trim();
+    const updated = {
+      ...target,
+      name: renameValue.endsWith(".stl")
+        ? renameValue
+        : `${renameValue}.stl`,
+    };
 
-    if (!cleanName) return;
+    const { url, ...stored } = updated;
 
-    const finalName = cleanName.toLowerCase().endsWith(".stl")
-      ? cleanName
-      : `${cleanName}.stl`;
-
-    const updated = { ...target, name: finalName };
-    const { url, ...storedRecord } = updated;
-
-    await saveStoredFile(storedRecord);
+    await saveStoredFile(stored);
 
     setFiles((current) =>
       current.map((file) => (file.id === id ? updated : file))
@@ -415,95 +208,22 @@ export default function App() {
 
     setRenamingId(null);
     setRenameValue("");
-    setStorageMessage("File renamed and saved to IndexedDB.");
-  }
-
-  function cancelRename() {
-    setRenamingId(null);
-    setRenameValue("");
-  }
-
-  async function addTagToSelected() {
-    const tag = tagInput.trim();
-
-    if (!tag || !selected || selected.tags.includes(tag)) return;
-
-    const updated = {
-      ...selected,
-      tags: [...selected.tags, tag],
-    };
-
-    const { url, ...storedRecord } = updated;
-
-    await saveStoredFile(storedRecord);
-
-    setFiles((current) =>
-      current.map((file) => (file.id === selected.id ? updated : file))
-    );
-
-    setTagInput("");
-  }
-
-  async function removeTag(fileId, tag) {
-    const target = files.find((file) => file.id === fileId);
-
-    if (!target) return;
-
-    const updated = {
-      ...target,
-      tags: target.tags.filter((t) => t !== tag),
-    };
-
-    const { url, ...storedRecord } = updated;
-
-    await saveStoredFile(storedRecord);
-
-    setFiles((current) =>
-      current.map((file) => (file.id === fileId ? updated : file))
-    );
-  }
-
-  async function clearLibrary() {
-    const confirmed = window.confirm(
-      "This will permanently remove all STL files from this browser's IndexedDB storage. Continue?"
-    );
-
-    if (!confirmed) return;
-
-    await clearStoredFiles();
-
-    files.forEach((file) => file.url && URL.revokeObjectURL(file.url));
-
-    setFiles([]);
-    setSelectedId(null);
-    setStorageMessage("Local IndexedDB library cleared.");
   }
 
   return (
     <div className="min-h-screen bg-zinc-950 p-4 text-zinc-100 md:p-8">
       <div className="mx-auto max-w-7xl">
-        <header className="mb-6 grid gap-4 rounded-3xl border border-zinc-800 bg-gradient-to-br from-zinc-900 to-zinc-950 p-6 shadow-2xl md:grid-cols-[1fr_auto] md:items-center">
+        <header className="mb-6 flex items-center justify-between rounded-3xl border border-zinc-800 bg-zinc-900 p-6">
           <div>
-            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-purple-500/30 bg-purple-500/10 px-3 py-1 text-xs font-medium text-purple-200">
-              <Archive className="h-3.5 w-3.5" />
-              Local STL Library
-            </div>
-
-            <h1 className="text-3xl font-bold tracking-tight text-white md:text-4xl">
-              STL Storage, Organizer, and Viewer
+            <h1 className="text-4xl font-bold text-white">
+              STL Storage Organizer
             </h1>
-
-            <p className="mt-2 max-w-2xl text-sm text-zinc-400">
-              Upload STL files, organize them by folder and tags, search your collection,
-              rename files, and preview models in a built-in 3D viewer.
-            </p>
           </div>
 
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-purple-600 px-5 py-3 font-semibold text-white shadow-lg shadow-purple-950/40 hover:bg-purple-500"
+            className="rounded-2xl bg-purple-600 px-5 py-3 font-semibold text-white"
           >
-            <Upload className="h-5 w-5" />
             Upload STL Files
           </button>
 
@@ -517,79 +237,17 @@ export default function App() {
           />
         </header>
 
-        <section className="mb-6 grid gap-4 md:grid-cols-4">
-          <div className="rounded-2xl border border-zinc-800 bg-zinc-900/80 p-4">
-            <div className="flex items-center gap-3">
-              <HardDrive className="h-5 w-5 text-purple-300" />
-              <span className="text-sm text-zinc-400">Files Stored</span>
-            </div>
-            <p className="mt-2 text-2xl font-bold text-white">{libraryStats.fileCount}</p>
-          </div>
-
-          <div className="rounded-2xl border border-zinc-800 bg-zinc-900/80 p-4">
-            <div className="flex items-center gap-3">
-              <FolderPlus className="h-5 w-5 text-purple-300" />
-              <span className="text-sm text-zinc-400">Active Folders</span>
-            </div>
-            <p className="mt-2 text-2xl font-bold text-white">{libraryStats.folderCount || 0}</p>
-          </div>
-
-          <div className="rounded-2xl border border-zinc-800 bg-zinc-900/80 p-4">
-            <div className="flex items-center gap-3">
-              <Box className="h-5 w-5 text-purple-300" />
-              <span className="text-sm text-zinc-400">Library Size</span>
-            </div>
-            <p className="mt-2 text-2xl font-bold text-white">
-              {formatBytes(libraryStats.totalSize)}
-            </p>
-          </div>
-
-          <div className="rounded-2xl border border-zinc-800 bg-zinc-900/80 p-4">
-            <div className="flex items-center gap-3">
-              <Database className="h-5 w-5 text-purple-300" />
-              <span className="text-sm text-zinc-400">Storage Mode</span>
-            </div>
-            <p className="mt-2 text-sm font-semibold text-white">IndexedDB</p>
-          </div>
-        </section>
-
         <main className="grid gap-6 lg:grid-cols-[420px_1fr]">
-          <aside className="rounded-2xl border border-zinc-800 bg-zinc-900/80 p-4 shadow-xl">
-            <div className="mb-4 rounded-xl border border-purple-500/20 bg-purple-500/10 p-3 text-xs text-purple-100">
-              {isLoadingLibrary ? "Loading saved STL files..." : storageMessage}
-            </div>
-
+          <aside className="rounded-2xl border border-zinc-800 bg-zinc-900/80 p-4">
             <div className="mb-4 flex items-center gap-2 rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2">
               <Search className="h-4 w-4 text-zinc-500" />
+
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search by name or tag..."
-                className="w-full bg-transparent text-sm text-zinc-100 outline-none placeholder:text-zinc-600"
+                placeholder="Search STL files..."
+                className="w-full bg-transparent outline-none"
               />
-            </div>
-
-            <div className="mb-4 grid grid-cols-2 gap-2">
-              <select
-                value={activeFolder}
-                onChange={(e) => setActiveFolder(e.target.value)}
-                className="rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-200"
-              >
-                {folders.map((folder) => (
-                  <option key={folder}>{folder}</option>
-                ))}
-              </select>
-
-              <select
-                value={folderFilter}
-                onChange={(e) => setFolderFilter(e.target.value)}
-                className="rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-200"
-              >
-                <option>All</option>
-                {folders.map((folder) => (
-                  <option key={folder}>{folder}</option>
-                ))}
-              </select>
             </div>
 
             <div className="mb-4 flex gap-2">
@@ -597,185 +255,68 @@ export default function App() {
                 value={newFolder}
                 onChange={(e) => setNewFolder(e.target.value)}
                 placeholder="New folder"
-                className="min-w-0 flex-1 rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm outline-none placeholder:text-zinc-600"
+                className="flex-1 rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2"
               />
 
               <button
                 onClick={addFolder}
-                className="rounded-xl bg-zinc-800 px-3 py-2 hover:bg-zinc-700"
+                className="rounded-xl bg-zinc-800 px-3 py-2"
               >
                 <Plus className="h-4 w-4" />
               </button>
             </div>
 
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="font-semibold text-white">Library</h2>
+            <div className="space-y-3">
+              {filteredFiles.map((file) => (
+                <div
+                  key={file.id}
+                  className="rounded-2xl border border-zinc-800 bg-zinc-950/70 p-3"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      {renamingId === file.id ? (
+                        <div className="flex items-center gap-2">
+                          <input
+                            value={renameValue}
+                            onChange={(e) => setRenameValue(e.target.value)}
+                            className="flex-1 rounded-lg border border-purple-500 bg-zinc-900 px-2 py-1"
+                          />
 
-              <div className="flex items-center gap-3">
-                <span className="text-xs text-zinc-500">{filteredFiles.length} shown</span>
-                {files.length > 0 && (
-                  <button
-                    onClick={clearLibrary}
-                    className="text-xs text-red-300 hover:text-red-200"
-                  >
-                    Clear All
-                  </button>
-                )}
-              </div>
-            </div>
-
-            <div className="max-h-[640px] space-y-3 overflow-auto pr-1">
-              {filteredFiles.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-zinc-700 p-5 text-center text-sm text-zinc-500">
-                  No STL files found.
-                </div>
-              ) : (
-                filteredFiles.map((file) => (
-                  <div
-                    key={file.id}
-                    className={`rounded-2xl border p-3 transition ${
-                      selectedId === file.id
-                        ? "border-purple-500 bg-purple-500/10"
-                        : "border-zinc-800 bg-zinc-950/70 hover:border-zinc-700"
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0 flex-1">
-                        {renamingId === file.id ? (
-                          <div className="flex items-center gap-2">
-                            <input
-                              value={renameValue}
-                              onChange={(e) => setRenameValue(e.target.value)}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") saveRename(file.id);
-                                if (e.key === "Escape") cancelRename();
-                              }}
-                              autoFocus
-                              className="min-w-0 flex-1 rounded-lg border border-purple-500/40 bg-zinc-900 px-2 py-1.5 text-sm text-white outline-none"
-                            />
-
-                            <button
-                              title="Save rename"
-                              onClick={() => saveRename(file.id)}
-                              className="rounded-lg p-1.5 text-green-300 hover:bg-green-500/10"
-                            >
-                              <Check className="h-4 w-4" />
-                            </button>
-
-                            <button
-                              title="Cancel rename"
-                              onClick={cancelRename}
-                              className="rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-800"
-                            >
-                              <X className="h-4 w-4" />
-                            </button>
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => setSelectedId(file.id)}
-                            className="min-w-0 text-left"
-                          >
-                            <div className="flex items-center gap-2">
-                              <Eye className="h-4 w-4 shrink-0 text-purple-300" />
-                              <p className="truncate font-medium text-white">{file.name}</p>
-                            </div>
-
-                            <p className="mt-1 text-xs text-zinc-500">
-                              {file.folder} · {formatBytes(file.size)}
-                            </p>
+                          <button onClick={() => saveRename(file.id)}>
+                            <Check className="h-4 w-4 text-green-400" />
                           </button>
-                        )}
-                      </div>
-
-                      <div className="flex shrink-0 items-center gap-1">
+                        </div>
+                      ) : (
                         <button
-                          title="Rename file"
-                          onClick={() => startRenaming(file)}
-                          className="rounded-lg p-1.5 text-purple-300 hover:bg-purple-500/10 hover:text-purple-200"
+                          onClick={() => setSelectedId(file.id)}
+                          className="text-left"
                         >
-                          <Pencil className="h-4 w-4" />
-                        </button>
+                          <p className="truncate font-medium text-white">
+                            {file.name}
+                          </p>
 
-                        <button
-                          title="Delete file"
-                          onClick={() => deleteFile(file.id)}
-                          className="rounded-lg p-1.5 text-zinc-500 hover:bg-red-500/10 hover:text-red-300"
-                        >
-                          <Trash2 className="h-4 w-4" />
+                          <p className="text-xs text-zinc-500">
+                            {file.folder} · {formatBytes(file.size)}
+                          </p>
                         </button>
-                      </div>
+                      )}
                     </div>
 
-                    <div className="mt-3 flex items-center gap-2">
-                      <select
-                        value={file.folder}
-                        onChange={(e) => moveFile(file.id, e.target.value)}
-                        className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-2 py-1.5 text-xs text-zinc-300"
-                      >
-                        {folders.map((folder) => (
-                          <option key={folder}>{folder}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {file.tags.length > 0 && (
-                      <div className="mt-3 flex flex-wrap gap-1.5">
-                        {file.tags.map((tag) => (
-                          <button
-                            key={tag}
-                            onClick={() => removeTag(file.id, tag)}
-                            className="inline-flex items-center gap-1 rounded-full bg-zinc-800 px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-700"
-                          >
-                            {tag}
-                            <X className="h-3 w-3" />
-                          </button>
-                        ))}
-                      </div>
-                    )}
+                    <button
+                      onClick={() => {
+                        setRenamingId(file.id);
+                        setRenameValue(file.name.replace(/\\.stl$/i, ""));
+                      }}
+                    >
+                      <Pencil className="h-4 w-4 text-purple-300" />
+                    </button>
                   </div>
-                ))
-              )}
+                </div>
+              ))}
             </div>
           </aside>
 
-          <section className="space-y-4">
-            <Viewer selected={selected} />
-
-            <div className="rounded-2xl border border-zinc-800 bg-zinc-900/80 p-4">
-              <div className="mb-3 flex items-center gap-2">
-                <Tag className="h-4 w-4 text-purple-300" />
-                <h3 className="font-semibold text-white">Tags for Selected File</h3>
-              </div>
-
-              <div className="flex gap-2">
-                <input
-                  value={tagInput}
-                  onChange={(e) => setTagInput(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && addTagToSelected()}
-                  disabled={!selected}
-                  placeholder={
-                    selected
-                      ? "Add tags like 28mm, terrain, infantry..."
-                      : "Select a file first"
-                  }
-                  className="min-w-0 flex-1 rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm outline-none disabled:opacity-50"
-                />
-
-                <button
-                  disabled={!selected}
-                  onClick={addTagToSelected}
-                  className="rounded-xl bg-purple-600 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40 hover:bg-purple-500"
-                >
-                  Add Tag
-                </button>
-              </div>
-
-              <p className="mt-3 text-xs text-zinc-500">
-                IndexedDB keeps files on this device and browser. Files persist after refresh,
-                but they do not sync across devices and are not uploaded to Vercel, GitHub, or any server.
-              </p>
-            </div>
-          </section>
+          <Viewer selected={selected} />
         </main>
       </div>
     </div>
